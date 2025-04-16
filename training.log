@@ -1,0 +1,12 @@
+2025-04-15 13:55:10,669 - INFO - Training on device: cpu
+2025-04-15 13:55:10,744 - INFO - Found 1 CSV files.
+2025-04-15 13:55:10,764 - ERROR - Error: preprocess.py must be in the same directory
+2025-04-15 13:55:46,118 - INFO - Training on device: cpu
+2025-04-15 13:55:46,120 - INFO - Found 1 CSV files.
+2025-04-15 13:55:46,130 - ERROR - Error: preprocess.py must be in the same directory
+2025-04-15 13:56:41,069 - INFO - Training on device: cpu
+2025-04-15 13:56:41,070 - INFO - Found 1 CSV files.
+2025-04-15 13:56:41,087 - ERROR - Error: preprocess.py must be in the same directory
+2025-04-15 14:09:50,315 - INFO - Training on device: cpu
+2025-04-15 14:09:50,321 - INFO - Found 1 CSV files.
+2025-04-15 14:09:50,339 - ERROR - Error: preprocess.py must be in the same directory

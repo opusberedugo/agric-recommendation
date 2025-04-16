@@ -1,0 +1,13 @@
+{
+    "input_dim": 4,
+    "crop_classes": 1,
+    "fertilizer_classes": 1,
+    "model_params": {
+        "emb_dim": 128,
+        "num_layers": 2,
+        "hidden_dim": 256
+    },
+    "total_params": 680358,
+    "trainable_params": 680358,
+    "timestamp": "2025-04-15 23:14:30"
+}

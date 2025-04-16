@@ -1,0 +1,5 @@
+python preprocess.py --input datasets.old --output dataset/processed
+
+python train.py --data dataset/processed --output models/agri_model --epochs 30
+
+python inference.py --model-dir ./models/agri_model --input-csv ./dataset/processed/Crop_Production/India/crop_data.csv --task-id 0 --device cpu
