@@ -1,0 +1,76 @@
+2025-04-19 10:01:09,231 - INFO - Using device: cpu
+2025-04-19 10:01:09,233 - ERROR - Error loading dataset: [Errno 13] Permission denied: 'dataset/'
+2025-04-19 10:02:01,878 - INFO - Using device: cpu
+2025-04-19 10:02:01,879 - ERROR - Error loading dataset: [Errno 13] Permission denied: 'dataset/processed'
+2025-04-19 10:09:44,606 - INFO - Using device: cpu
+2025-04-19 10:09:44,607 - ERROR - Error loading dataset: [Errno 13] Permission denied: 'dataset/processed'
+2025-04-19 14:55:33,405 - INFO - Using device: cpu
+2025-04-19 14:55:33,408 - INFO - Loading data from: dataset/processed
+2025-04-19 14:55:33,409 - INFO - Searching for CSV files in: dataset/processed
+2025-04-19 14:55:33,412 - INFO - Found 22 CSV files
+2025-04-19 14:55:33,416 - INFO - Processing: dataset/processed\Crop Production\India\Crop_production.csv
+2025-04-19 14:55:33,574 - WARNING -   Required columns not found in dataset/processed\Crop Production\India\Crop_production.csv
+2025-04-19 14:55:33,575 - WARNING -   Available columns: ['feature_Unnamed: 0', 'feature_State_Name', 'feature_Crop_Type', 'feature_Crop', 'feature_N', 'feature_P', 'feature_K', 'feature_pH', 'feature_rainfall', 'feature_temperature', 'feature_Area_in_hectares', 'feature_Production_in_tons', 'feature_Yield_ton_per_hec', 'task_id', 'crop_label', 'fertilizer_label']
+2025-04-19 14:55:33,576 - INFO - Processing: dataset/processed\Crop Production\India\crop_yield.csv
+2025-04-19 14:55:33,833 - WARNING -   Required columns not found in dataset/processed\Crop Production\India\crop_yield.csv
+2025-04-19 14:55:33,833 - WARNING -   Available columns: ['feature_State_Name', 'feature_District_Name', 'feature_Crop_Year', 'feature_Season', 'feature_Crop', 'feature_Area', 'feature_Production', 'task_id', 'crop_label', 'fertilizer_label']
+2025-04-19 14:55:33,834 - INFO - Processing: dataset/processed\Crop Production\India\Data_after_rainfall.csv
+2025-04-19 14:55:34,026 - WARNING -   Required columns not found in dataset/processed\Crop Production\India\Data_after_rainfall.csv
+2025-04-19 14:55:34,026 - WARNING -   Available columns: ['feature_State_Name', 'feature_Crop_Type', 'feature_Crop', 'feature_rainfall', 'feature_Area_in_hectares', 'feature_Production_in_tons', 'feature_Yield_ton_per_hec', 'task_id', 'crop_label', 'fertilizer_label']
+2025-04-19 14:55:34,027 - INFO - Processing: dataset/processed\Crop Production\India\Fertilizer.csv
+2025-04-19 14:55:34,047 - WARNING -   Required columns not found in dataset/processed\Crop Production\India\Fertilizer.csv
+2025-04-19 14:55:34,047 - WARNING -   Available columns: ['feature_Unnamed: 0', 'feature_Crop', 'feature_N', 'feature_P', 'feature_K', 'feature_pH', 'task_id', 'crop_label', 'fertilizer_label']
+2025-04-19 14:55:34,048 - INFO - Processing: dataset/processed\Crop Production\India\Final_Dataset_after_temperature.csv
+2025-04-19 14:55:34,234 - WARNING -   Required columns not found in dataset/processed\Crop Production\India\Final_Dataset_after_temperature.csv
+2025-04-19 14:55:34,235 - WARNING -   Available columns: ['feature_State_Name', 'feature_Crop_Type', 'feature_Crop', 'feature_rainfall', 'feature_temperature', 'feature_Area_in_hectares', 'feature_Production_in_tons', 'feature_Yield_ton_per_hec', 'task_id', 'crop_label', 'fertilizer_label']
+2025-04-19 14:55:34,236 - INFO - Processing: dataset/processed\Crop Production\India\final_rainfall.csv
+2025-04-19 14:55:34,250 - WARNING -   Required columns not found in dataset/processed\Crop Production\India\final_rainfall.csv
+2025-04-19 14:55:34,251 - WARNING -   Available columns: ['feature_yearly_rainfall', 'feature_kharif_rainfall', 'feature_rabi_rainfall', 'feature_summer_rainfall', 'task_id', 'crop_label', 'fertilizer_label']
+2025-04-19 14:55:34,251 - INFO - Processing: dataset/processed\Crop Production\India\final_temperature.csv
+2025-04-19 14:55:34,264 - WARNING -   Required columns not found in dataset/processed\Crop Production\India\final_temperature.csv
+2025-04-19 14:55:34,264 - WARNING -   Available columns: ['feature_States', 'feature_kharif_temp', 'feature_rabi_temp', 'feature_summer_temp', 'feature_yearly_temp', 'task_id', 'crop_label', 'fertilizer_label']
+2025-04-19 14:55:34,265 - INFO - Processing: dataset/processed\Crop Production\India\ICRISAT-District Level Data.csv
+2025-04-19 14:55:34,378 - WARNING -   Required columns not found in dataset/processed\Crop Production\India\ICRISAT-District Level Data.csv
+2025-04-19 14:55:34,379 - WARNING -   Available columns: ['feature_Dist Code', 'feature_Year', 'feature_State Code', 'feature_State Name', 'feature_Dist Name', 'feature_RICE AREA (1000 ha)', 'feature_RICE PRODUCTION (1000 tons)', 'feature_RICE YIELD (Kg per ha)', 'feature_WHEAT AREA (1000 ha)', 'feature_WHEAT PRODUCTION (1000 tons)', 'feature_WHEAT YIELD (Kg per ha)', 'feature_KHARIF SORGHUM AREA (1000 ha)', 'feature_KHARIF SORGHUM PRODUCTION (1000 tons)', 'feature_KHARIF SORGHUM YIELD (Kg per ha)', 'feature_RABI SORGHUM AREA (1000 ha)', 'feature_RABI SORGHUM PRODUCTION (1000 tons)', 'feature_RABI SORGHUM YIELD (Kg per ha)', 'feature_SORGHUM AREA (1000 ha)', 'feature_SORGHUM PRODUCTION (1000 tons)', 'feature_SORGHUM YIELD (Kg per ha)', 'feature_PEARL MILLET AREA (1000 ha)', 'feature_PEARL MILLET PRODUCTION (1000 tons)', 'feature_PEARL MILLET YIELD (Kg per ha)', 'feature_MAIZE AREA (1000 ha)', 'feature_MAIZE PRODUCTION (1000 tons)', 'feature_MAIZE YIELD (Kg per ha)', 'feature_FINGER MILLET AREA (1000 ha)', 'feature_FINGER MILLET PRODUCTION (1000 tons)', 'feature_FINGER MILLET YIELD (Kg per ha)', 'feature_BARLEY AREA (1000 ha)', 'feature_BARLEY PRODUCTION (1000 tons)', 'feature_BARLEY YIELD (Kg per ha)', 'feature_CHICKPEA AREA (1000 ha)', 'feature_CHICKPEA PRODUCTION (1000 tons)', 'feature_CHICKPEA YIELD (Kg per ha)', 'feature_PIGEONPEA AREA (1000 ha)', 'feature_PIGEONPEA PRODUCTION (1000 tons)', 'feature_PIGEONPEA YIELD (Kg per ha)', 'feature_MINOR PULSES AREA (1000 ha)', 'feature_MINOR PULSES PRODUCTION (1000 tons)', 'feature_MINOR PULSES YIELD (Kg per ha)', 'feature_GROUNDNUT AREA (1000 ha)', 'feature_GROUNDNUT PRODUCTION (1000 tons)', 'feature_GROUNDNUT YIELD (Kg per ha)', 'feature_SESAMUM AREA (1000 ha)', 'feature_SESAMUM PRODUCTION (1000 tons)', 'feature_SESAMUM YIELD (Kg per ha)', 'feature_RAPESEED AND MUSTARD AREA (1000 ha)', 'feature_RAPESEED AND MUSTARD PRODUCTION (1000 tons)', 'feature_RAPESEED AND MUSTARD YIELD (Kg per ha)', 'feature_SAFFLOWER AREA (1000 ha)', 'feature_SAFFLOWER PRODUCTION (1000 tons)', 'feature_SAFFLOWER YIELD (Kg per ha)', 'feature_CASTOR AREA (1000 ha)', 'feature_CASTOR PRODUCTION (1000 tons)', 'feature_CASTOR YIELD (Kg per ha)', 'feature_LINSEED AREA (1000 ha)', 'feature_LINSEED PRODUCTION (1000 tons)', 'feature_LINSEED YIELD (Kg per ha)', 'feature_SUNFLOWER AREA (1000 ha)', 'feature_SUNFLOWER PRODUCTION (1000 tons)', 'feature_SUNFLOWER YIELD (Kg per ha)', 'feature_SOYABEAN AREA (1000 ha)', 'feature_SOYABEAN PRODUCTION (1000 tons)', 'feature_SOYABEAN YIELD (Kg per ha)', 'feature_OILSEEDS AREA (1000 ha)', 'feature_OILSEEDS PRODUCTION (1000 tons)', 'feature_OILSEEDS YIELD (Kg per ha)', 'feature_SUGARCANE AREA (1000 ha)', 'feature_SUGARCANE PRODUCTION (1000 tons)', 'feature_SUGARCANE YIELD (Kg per ha)', 'feature_COTTON AREA (1000 ha)', 'feature_COTTON PRODUCTION (1000 tons)', 'feature_COTTON YIELD (Kg per ha)', 'feature_FRUITS AREA (1000 ha)', 'feature_VEGETABLES AREA (1000 ha)', 'feature_FRUITS AND VEGETABLES AREA (1000 ha)', 'feature_POTATOES AREA (1000 ha)', 'feature_ONION AREA (1000 ha)', 'feature_FODDER AREA (1000 ha)', 'task_id', 'crop_label', 'fertilizer_label']
+2025-04-19 14:55:34,379 - INFO - Processing: dataset/processed\Crop Production\India\India Agriculture Crop Production.csv
+2025-04-19 14:55:34,803 - WARNING -   Required columns not found in dataset/processed\Crop Production\India\India Agriculture Crop Production.csv
+2025-04-19 14:55:34,803 - WARNING -   Available columns: ['feature_State', 'feature_District', 'feature_Crop', 'feature_Year', 'feature_Season', 'feature_Area', 'feature_Area Units', 'feature_Production', 'feature_Production Units', 'feature_Yield', 'task_id', 'crop_label', 'fertilizer_label']
+2025-04-19 14:55:34,803 - INFO - Processing: dataset/processed\Crop Production\India\rainfall_validation.csv
+2025-04-19 14:55:34,849 - WARNING -   Required columns not found in dataset/processed\Crop Production\India\rainfall_validation.csv
+2025-04-19 14:55:34,850 - WARNING -   Available columns: ['feature_SUBDIVISION', 'feature_YEAR', 'feature_JAN', 'feature_FEB', 'feature_MAR', 'feature_APR', 'feature_MAY', 'feature_JUN', 'feature_JUL', 'feature_AUG', 'feature_SEP', 'feature_OCT', 'feature_NOV', 'feature_DEC', 'task_id', 'crop_label', 'fertilizer_label']
+2025-04-19 14:55:34,850 - INFO - Processing: dataset/processed\Crop Production\India\temperature.csv
+2025-04-19 14:55:34,864 - WARNING -   Required columns not found in dataset/processed\Crop Production\India\temperature.csv
+2025-04-19 14:55:34,865 - WARNING -   Available columns: ['feature_Unnamed: 0', 'feature_Jan', 'feature_Feb', 'feature_Mar', 'feature_Apr', 'feature_May', 'feature_June', 'feature_July', 'feature_Aug', 'feature_Sep', 'feature_Oct', 'feature_Nov', 'feature_Dec', 'task_id', 'crop_label', 'fertilizer_label']
+2025-04-19 14:55:34,938 - WARNING -   Available columns: ['feature_Year', 'feature_Location', 'feature_Area', 'feature_Rainfall', 'feature_Temperature', 'feature_Soil type', 'feature_Irrigation', 'feature_yeilds', 'feature_Humidity', 'feature_Crops', 'feature_price', 'feature_Season', 'task_id', 'crop_label', 'fertilizer_label']
+2025-04-19 14:55:34,939 - INFO - Processing: dataset/processed\Crop Yield Prediction\Global\pesticides.csv
+2025-04-19 14:55:34,963 - WARNING -   Required columns not found in dataset/processed\Crop Yield Prediction\Global\pesticides.csv
+2025-04-19 14:55:34,963 - WARNING -   Available columns: ['feature_Domain', 'feature_Area', 'feature_Element', 'feature_Item', 'feature_Year', 'feature_Unit', 'feature_Value', 'task_id', 'crop_label', 'fertilizer_label']
+2025-04-19 14:55:34,964 - INFO - Processing: dataset/processed\Crop Yield Prediction\Global\rainfall.csv
+2025-04-19 14:55:34,985 - WARNING -   Required columns not found in dataset/processed\Crop Yield Prediction\Global\rainfall.csv
+2025-04-19 14:55:34,985 - WARNING -   Available columns: ['feature_ Area', 'feature_Year', 'feature_average_rain_fall_mm_per_year', 'task_id', 'crop_label', 'fertilizer_label']
+2025-04-19 14:55:34,986 - INFO - Processing: dataset/processed\Crop Yield Prediction\Global\temp.csv
+2025-04-19 14:55:35,042 - WARNING -   Required columns not found in dataset/processed\Crop Yield Prediction\Global\temp.csv
+2025-04-19 14:55:35,043 - WARNING -   Available columns: ['feature_year', 'feature_country', 'feature_avg_temp', 'task_id', 'crop_label', 'fertilizer_label']
+2025-04-19 14:55:35,043 - INFO - Processing: dataset/processed\Crop Yield Prediction\Global\yield.csv
+2025-04-19 14:55:35,142 - WARNING -   Required columns not found in dataset/processed\Crop Yield Prediction\Global\yield.csv
+2025-04-19 14:55:35,142 - WARNING -   Available columns: ['feature_Domain Code', 'feature_Domain', 'feature_Area Code', 'feature_Area', 'feature_Element Code', 'feature_Element', 'feature_Item Code', 'feature_Item', 'feature_Year Code', 'feature_Year', 'feature_Unit', 'feature_Value', 'task_id', 'crop_label', 'fertilizer_label']
+2025-04-19 14:55:35,143 - INFO - Processing: dataset/processed\Crop Yield Prediction\Global\yield_df.csv
+2025-04-19 14:55:35,193 - WARNING -   Required columns not found in dataset/processed\Crop Yield Prediction\Global\yield_df.csv
+2025-04-19 14:55:35,194 - WARNING -   Available columns: ['feature_Unnamed: 0', 'feature_Area', 'feature_Item', 'feature_Year', 'feature_hg/ha_yield', 'feature_average_rain_fall_mm_per_year', 'feature_pesticides_tonnes', 'feature_avg_temp', 'task_id', 'crop_label', 'fertilizer_label']
+2025-04-19 14:55:35,194 - INFO - Processing: dataset/processed\Genral\Global\agriculture_dataset.csv
+2025-04-19 14:55:35,211 - WARNING -   Required columns not found in dataset/processed\Genral\Global\agriculture_dataset.csv
+2025-04-19 14:55:35,212 - WARNING -   Available columns: ['feature_Farm_ID', 'feature_Crop_Type', 'feature_Farm_Area(acres)', 'feature_Irrigation_Type', 'feature_Fertilizer_Used(tons)', 'feature_Pesticide_Used(kg)', 'feature_Yield(tons)', 'feature_Soil_Type', 'feature_Season', 'feature_Water_Usage(cubic meters)', 'task_id', 'crop_label', 'fertilizer_label']
+2025-04-19 14:55:35,212 - INFO - Processing: dataset/processed\Global\climate_change_impact_on_agriculture_2024.csv
+2025-04-19 14:55:35,243 - WARNING -   Required columns not found in dataset/processed\Global\climate_change_impact_on_agriculture_2024.csv
+2025-04-19 14:55:35,244 - WARNING -   Available columns: ['feature_Year', 'feature_Country', 'feature_Region', 'feature_Crop_Type', 'feature_Average_Temperature_C', 'feature_Total_Precipitation_mm', 'feature_CO2_Emissions_MT', 'feature_Crop_Yield_MT_per_HA', 'feature_Extreme_Weather_Events', 'feature_Irrigation_Access_%', 'feature_Pesticide_Use_KG_per_HA', 'feature_Fertilizer_Use_KG_per_HA', 'feature_Soil_Health_Index', 'feature_Adaptation_Strategies', 'feature_Economic_Impact_Million_USD', 'task_id', 'crop_label', 'fertilizer_label']
+2025-04-19 14:55:35,244 - INFO - Processing: dataset/processed\Pesticide Use\US\2014.csv
+2025-04-19 14:55:35,499 - WARNING -   Required columns not found in dataset/processed\Pesticide Use\US\2014.csv
+2025-04-19 14:55:35,500 - WARNING -   Available columns: ['feature_COMPOUND', 'feature_YEAR', 'feature_STATE_CODE', 'feature_COUNTY_CODE', 'feature_LOW_ESTIMATE', 'feature_HIGH_ESTIMATE', 'task_id', 'crop_label', 'fertilizer_label']
+2025-04-19 14:55:35,500 - INFO - Processing: dataset/processed\Pesticide Use\US\2015.csv
+2025-04-19 14:55:35,748 - WARNING -   Required columns not found in dataset/processed\Pesticide Use\US\2015.csv
+2025-04-19 14:55:35,748 - WARNING -   Available columns: ['feature_COMPOUND', 'feature_YEAR', 'feature_STATE_CODE', 'feature_COUNTY_CODE', 'feature_LOW_ESTIMATE', 'feature_HIGH_ESTIMATE', 'task_id', 'crop_label', 'fertilizer_label']
+2025-04-19 14:55:35,749 - INFO - Processing: dataset/processed\Pesticide Use\US\dictionary.csv
+2025-04-19 14:55:35,774 - WARNING -   Required columns not found in dataset/processed\Pesticide Use\US\dictionary.csv
+2025-04-19 14:55:35,775 - WARNING -   Available columns: ['feature_STATE_CODE', 'feature_COUNTY_CODE', 'feature_COUNTY', 'feature_STATE', 'task_id', 'crop_label', 'fertilizer_label']
+2025-04-19 14:55:35,775 - ERROR - No valid prompt-response pairs found in any CSV file
+2025-04-19 14:55:35,776 - ERROR - Failed to load dataset. Exiting.

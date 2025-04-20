@@ -1,655 +1,570 @@
-# train.py
+import os
+import pandas as pd
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, ConcatDataset, random_split
-from torch.optim.lr_scheduler import ReduceLROnPlateau
-import pandas as pd
-import numpy as np
-import os
-import sys
+from torch.utils.data import Dataset, DataLoader, random_split
+import pickle
+import argparse
 import time
 import logging
-import json
-from pathlib import Path
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-from datetime import datetime
+from sklearn.model_selection import train_test_split
+import glob
 
-# Import local modules
-from model import AgriRecommender
-from data_loader import AgriDataset
-from preprocess import standardize_columns, infer_task_id, process_csv
-
-# Setup logging
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("training.log"),
-        logging.StreamHandler(sys.stdout)
+        logging.FileHandler("nlp_training.log"),
+        logging.StreamHandler()
     ]
 )
 
-class EarlyStopping:
-    """Early stopping to prevent overfitting"""
-    def __init__(self, patience=5, min_delta=0.001, checkpoint_path='best_model.pt'):
-        self.patience = patience
-        self.min_delta = min_delta
-        self.counter = 0
-        self.best_loss = float('inf')
-        self.checkpoint_path = checkpoint_path
+# Constants
+MAX_SEQ_LENGTH = 100
+BATCH_SIZE = 16
+EMBEDDING_DIM = 128
+HIDDEN_DIM = 256
+NUM_LAYERS = 2
+DROPOUT = 0.2
+LEARNING_RATE = 0.001
+EPOCHS = 20
+
+class SimpleTokenizer:
+    """A simple tokenizer class similar to Keras Tokenizer"""
+    
+    def __init__(self, num_words=None, oov_token='<UNK>'):
+        self.num_words = num_words
+        self.oov_token = oov_token
+        self.word_index = {}
+        self.index_word = {}
+        self.word_counts = {}
+        self.document_count = 0
+        # Add special tokens
+        self.word_index['<PAD>'] = 0  # Padding token
+        self.word_index['<UNK>'] = 1  # Unknown token
+        self.word_index['<START>'] = 2  # Start of sequence token
+        self.word_index['<END>'] = 3  # End of sequence token
+        self.index_word = {v: k for k, v in self.word_index.items()}
         
-    def __call__(self, val_loss, model):
-        if val_loss < self.best_loss - self.min_delta:
-            self.best_loss = val_loss
-            self.counter = 0
-            torch.save(model.state_dict(), self.checkpoint_path)
-            logging.info(f"Validation loss decreased to {val_loss:.4f}. Saving model...")
-            return False
+    def fit_on_texts(self, texts):
+        """Build vocabulary from list of texts"""
+        for text in texts:
+            self.document_count += 1
+            for word in text.lower().split():
+                if word in self.word_counts:
+                    self.word_counts[word] += 1
+                else:
+                    self.word_counts[word] = 1
+        
+        # Sort words by frequency
+        sorted_words = sorted(self.word_counts.items(), key=lambda x: x[1], reverse=True)
+        
+        # Only keep most common words if num_words is specified
+        if self.num_words is not None:
+            sorted_words = sorted_words[:self.num_words - 4]  # -4 for special tokens
+        
+        # Create word index
+        for word, _ in sorted_words:
+            idx = len(self.word_index)
+            self.word_index[word] = idx
+            self.index_word[idx] = word
+            
+    def texts_to_sequences(self, texts):
+        """Convert texts to sequences of integers"""
+        sequences = []
+        for text in texts:
+            seq = []
+            for word in text.lower().split():
+                if word in self.word_index:
+                    seq.append(self.word_index[word])
+                else:
+                    seq.append(self.word_index[self.oov_token])
+            sequences.append(seq)
+        return sequences
+    
+    def sequences_to_texts(self, sequences):
+        """Convert sequences back to texts"""
+        texts = []
+        for seq in sequences:
+            text = []
+            for idx in seq:
+                if idx in self.index_word:
+                    text.append(self.index_word[idx])
+                else:
+                    text.append(self.oov_token)
+            texts.append(' '.join(text))
+        return texts
+
+def pad_sequences(sequences, maxlen, padding='post', value=0):
+    """Pad sequences to the same length"""
+    padded_sequences = []
+    for seq in sequences:
+        if len(seq) > maxlen:
+            padded_seq = seq[:maxlen]
         else:
-            self.counter += 1
-            logging.info(f"EarlyStopping counter: {self.counter} out of {self.patience}")
-            if self.counter >= self.patience:
-                logging.info(f"Early stopping triggered. Best val loss: {self.best_loss:.4f}")
-                return True
-        return False
+            if padding == 'post':
+                padded_seq = seq + [value] * (maxlen - len(seq))
+            else:  # 'pre'
+                padded_seq = [value] * (maxlen - len(seq)) + seq
+        padded_sequences.append(padded_seq)
+    return padded_sequences
 
-def load_all_csvs(root_folder):
-    """Load and compile all CSV files recursively from a directory"""
-    csv_paths = []
-    for dirpath, _, filenames in os.walk(root_folder):
-        for f in filenames:
-            if f.endswith(".csv"):
-                csv_paths.append(os.path.join(dirpath, f))
-    return csv_paths
-
-def preprocess_dataframe(df, file_path):
-    """Apply preprocessing to a dataframe before creating dataset"""
-    # Standardize columns 
-    df = standardize_columns(df)
+class AgriNLPDataset(Dataset):
+    """Dataset for agricultural NLP model"""
     
-    # Add or infer task_id
-    task_id = infer_task_id(file_path)
-    df['task_id'] = task_id
-    
-    # Add default labels if not present
-    if 'crop_label' not in df.columns:
-        df['crop_label'] = "unknown"  # Placeholder
-    if 'fertilizer_label' not in df.columns:
-        df['fertilizer_label'] = "unknown"  # Placeholder
+    def __init__(self, prompts, responses, tokenizer, max_length=MAX_SEQ_LENGTH):
+        self.prompts = prompts
+        self.responses = responses
+        self.tokenizer = tokenizer
+        self.max_length = max_length
         
-    return df
-
-def create_datasets(csv_files, test_size=0.2, val_size=0.1):
-    """Create and split datasets from CSV files"""
-    datasets = []
-    input_dim = None
-    n_crop_classes = 0
-    n_fert_classes = 0
+        # Convert texts to sequences
+        self.prompt_seqs = self.tokenizer.texts_to_sequences(self.prompts)
+        self.response_seqs = self.tokenizer.texts_to_sequences(self.responses)
+        
+        # Add START and END tokens to responses
+        for i in range(len(self.response_seqs)):
+            self.response_seqs[i] = [self.tokenizer.word_index['<START>']] + self.response_seqs[i] + [self.tokenizer.word_index['<END>']]
+        
+        # Pad sequences
+        self.prompt_seqs = pad_sequences(self.prompt_seqs, maxlen=self.max_length, padding='post')
+        self.response_seqs = pad_sequences(self.response_seqs, maxlen=self.max_length, padding='post')
+        
+    def __len__(self):
+        return len(self.prompts)
     
-    for csv_path in tqdm(csv_files, desc="Loading datasets"):
-        try:
-            df = pd.read_csv(csv_path)
-            if not df.empty:
-                # Preprocess the dataframe
-                df = preprocess_dataframe(df, csv_path)
+    def __getitem__(self, idx):
+        # For input, return the prompt sequence
+        prompt = torch.tensor(self.prompt_seqs[idx], dtype=torch.long)
+        
+        # For target, we need the response sequence shifted by 1
+        response_input = torch.tensor(self.response_seqs[idx][:-1], dtype=torch.long)
+        response_target = torch.tensor(self.response_seqs[idx][1:], dtype=torch.long)
+        
+        # Pad if needed (should already be padded but just in case)
+        if len(response_input) < self.max_length - 1:
+            padding = torch.zeros(self.max_length - 1 - len(response_input), dtype=torch.long)
+            response_input = torch.cat([response_input, padding])
+            response_target = torch.cat([response_target, padding])
+        
+        return {
+            'prompt': prompt,
+            'response_input': response_input,
+            'response_target': response_target
+        }
+
+class AgriNLPModel(nn.Module):
+    """PyTorch model for agricultural NLP response generation"""
+    
+    def __init__(self, vocab_size, embedding_dim=EMBEDDING_DIM, hidden_dim=HIDDEN_DIM, num_layers=NUM_LAYERS, dropout=DROPOUT):
+        super(AgriNLPModel, self).__init__()
+        
+        # Embedding layer
+        self.embedding = nn.Embedding(vocab_size, embedding_dim)
+        
+        # Encoder LSTM
+        self.encoder = nn.LSTM(
+            input_size=embedding_dim,
+            hidden_size=hidden_dim,
+            num_layers=num_layers,
+            batch_first=True,
+            dropout=dropout if num_layers > 1 else 0,
+            bidirectional=True
+        )
+        
+        # Decoder LSTM
+        self.decoder = nn.LSTM(
+            input_size=embedding_dim,
+            hidden_size=hidden_dim * 2,  # * 2 because encoder is bidirectional
+            num_layers=num_layers,
+            batch_first=True,
+            dropout=dropout if num_layers > 1 else 0
+        )
+        
+        # Output layer
+        self.output = nn.Linear(hidden_dim * 2, vocab_size)
+        
+        # Dropout
+        self.dropout = nn.Dropout(dropout)
+        
+    def forward(self, prompt, response=None):
+        # Embedding
+        prompt_embedded = self.embedding(prompt)
+        
+        # Encoding
+        _, (hidden, cell) = self.encoder(prompt_embedded)
+        
+        # Convert encoder hidden state for decoder (bidirectional to unidirectional)
+        hidden = hidden.view(NUM_LAYERS, 2, -1, HIDDEN_DIM)  # [layers, directions, batch, hidden]
+        hidden = torch.cat([hidden[:, 0], hidden[:, 1]], dim=2)  # [layers, batch, hidden*2]
+        
+        cell = cell.view(NUM_LAYERS, 2, -1, HIDDEN_DIM)
+        cell = torch.cat([cell[:, 0], cell[:, 1]], dim=2)
+        
+        # If we have a response (training), use it for decoding
+        if response is not None:
+            response_embedded = self.embedding(response)
+            decoder_output, _ = self.decoder(response_embedded, (hidden, cell))
+            output = self.output(self.dropout(decoder_output))
+            return output
+        else:
+            # For inference, we would implement beam search or greedy decoding here
+            # Just a placeholder for now
+            return None
+
+def find_csv_files(path):
+    """Recursively find all CSV files in a directory and its subdirectories"""
+    csv_files = []
+    
+    # Check if the path is a directory
+    if os.path.isdir(path):
+        logging.info(f"Searching for CSV files in: {path}")
+        
+        # Walk through all directories and subdirectories
+        for root, dirs, files in os.walk(path):
+            for file in files:
+                if file.endswith('.csv'):
+                    csv_files.append(os.path.join(root, file))
+    
+    # If it's a single file and it's a CSV
+    elif os.path.isfile(path) and path.endswith('.csv'):
+        csv_files.append(path)
+    
+    logging.info(f"Found {len(csv_files)} CSV files")
+    return csv_files
+
+def load_dataset(path):
+    """Load the dataset from a CSV file or directory structure"""
+    try:
+        # Find all CSV files in the path
+        csv_files = find_csv_files(path)
+        
+        if not csv_files:
+            logging.error(f"No CSV files found in {path}")
+            return None
+        
+        # Initialize lists to store data
+        all_prompts = []
+        all_responses = []
+        
+        # Process each CSV file
+        for file_path in tqdm(csv_files, desc="Loading CSV files"):
+            try:
+                logging.info(f"Processing: {file_path}")
+                df = pd.read_csv(file_path)
                 
-                try:
-                    dataset = AgriDataset(df)
-                    datasets.append(dataset)
+                # Check for required columns
+                if 'prompt' in df.columns and 'response' in df.columns:
+                    prompts = df['prompt'].tolist()
+                    responses = df['response'].tolist()
                     
-                    # Update input dimension
-                    if input_dim is None:
-                        input_dim = dataset.input_dim
+                    logging.info(f"  Found {len(prompts)} prompt-response pairs")
+                    all_prompts.extend(prompts)
+                    all_responses.extend(responses)
+                # Try alternative column names
+                elif 'query' in df.columns and 'response' in df.columns:
+                    prompts = df['query'].tolist()
+                    responses = df['response'].tolist()
                     
-                    # Track the number of classes
-                    n_crop_classes = max(n_crop_classes, len(dataset.label_enc_crop.classes_))
-                    n_fert_classes = max(n_fert_classes, len(dataset.label_enc_fert.classes_))
+                    logging.info(f"  Found {len(prompts)} query-response pairs")
+                    all_prompts.extend(prompts)
+                    all_responses.extend(responses)
+                elif 'question' in df.columns and 'answer' in df.columns:
+                    prompts = df['question'].tolist()
+                    responses = df['answer'].tolist()
                     
-                    logging.info(f"Loaded: {csv_path} - {len(dataset)} samples")
-                except Exception as e:
-                    logging.error(f"Error creating dataset from {csv_path}: {e}")
-        except Exception as e:
-            logging.error(f"Skipping {csv_path}, error: {e}")
+                    logging.info(f"  Found {len(prompts)} question-answer pairs")
+                    all_prompts.extend(prompts)
+                    all_responses.extend(responses)
+                else:
+                    logging.warning(f"  Required columns not found in {file_path}")
+                    logging.warning(f"  Available columns: {df.columns.tolist()}")
+                    
+            except Exception as e:
+                logging.error(f"Error processing {file_path}: {e}")
+        
+        if not all_prompts:
+            logging.error("No valid prompt-response pairs found in any CSV file")
+            return None
+        
+        logging.info(f"Loaded a total of {len(all_prompts)} prompt-response pairs")
+        return all_prompts, all_responses
+    
+    except Exception as e:
+        logging.error(f"Error loading dataset: {e}")
+        return None
 
-    if not datasets:
-        logging.error("No valid datasets found. Please check your CSV files.")
-        return None, None, None, None, None, None
+def create_tokenizer(prompts, responses, max_words=10000):
+    """Create and fit a tokenizer on all text"""
+    # Combine prompts and responses for vocabulary
+    all_texts = prompts + responses
     
-    # Combine all datasets
-    full_dataset = ConcatDataset(datasets)
+    # Create tokenizer
+    tokenizer = SimpleTokenizer(num_words=max_words)
+    tokenizer.fit_on_texts(all_texts)
     
-    # Calculate split sizes
-    total_size = len(full_dataset)
-    test_size_abs = int(test_size * total_size)
-    val_size_abs = int(val_size * total_size)
-    train_size = total_size - test_size_abs - val_size_abs
-    
-    # Split into train, validation, and test sets
-    train_dataset, val_dataset, test_dataset = random_split(
-        full_dataset, 
-        [train_size, val_size_abs, test_size_abs],
-        generator=torch.Generator().manual_seed(42)
-    )
-    
-    logging.info(f"Dataset splits - Train: {len(train_dataset)}, Val: {len(val_dataset)}, Test: {len(test_dataset)}")
-    
-    return train_dataset, val_dataset, test_dataset, input_dim, n_crop_classes, n_fert_classes
+    logging.info(f"Created tokenizer with {len(tokenizer.word_index)} words")
+    return tokenizer
 
-def train_epoch(model, dataloader, optimizer, crop_criterion, fert_criterion, device, clip_value=1.0):
+def train_epoch(model, dataloader, criterion, optimizer, device):
     """Train for one epoch"""
     model.train()
-    epoch_loss = 0
-    crop_losses = 0
-    fert_losses = 0
-    correct_crops = 0
-    correct_ferts = 0
-    total_samples = 0
+    total_loss = 0
     
     progress_bar = tqdm(dataloader, desc="Training")
     for batch in progress_bar:
-        x, task_id, crop_target, fert_target = batch
-        x, task_id = x.to(device), task_id.to(device)
-        crop_target, fert_target = crop_target.to(device), fert_target.to(device)
+        # Move batch to device
+        prompt = batch['prompt'].to(device)
+        response_input = batch['response_input'].to(device)
+        response_target = batch['response_target'].to(device)
         
         # Zero gradients
         optimizer.zero_grad()
         
         # Forward pass
-        outputs = model(x, task_id)
+        output = model(prompt, response_input)
         
-        # Calculate losses
-        crop_loss = crop_criterion(outputs['crop'], crop_target)
-        fert_loss = fert_criterion(outputs['fertilizer'], fert_target)
+        # Reshape for cross entropy
+        output = output.view(-1, output.size(2))
+        response_target = response_target.view(-1)
         
-        # Combined loss - weighted by task importance
-        loss = crop_loss + fert_loss
+        # Calculate loss (ignoring padding)
+        loss = criterion(output, response_target)
         
         # Backward pass and optimize
         loss.backward()
-        
-        # Gradient clipping to prevent exploding gradients
-        torch.nn.utils.clip_grad_norm_(model.parameters(), clip_value)
-        
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)  # Gradient clipping
         optimizer.step()
         
-        # Track metrics
-        epoch_loss += loss.item() * x.size(0)
-        crop_losses += crop_loss.item() * x.size(0)
-        fert_losses += fert_loss.item() * x.size(0)
-        
-        # Calculate accuracy
-        _, crop_preds = torch.max(outputs['crop'], 1)
-        _, fert_preds = torch.max(outputs['fertilizer'], 1)
-        correct_crops += (crop_preds == crop_target).sum().item()
-        correct_ferts += (fert_preds == fert_target).sum().item()
-        total_samples += x.size(0)
-        
-        # Update progress bar
-        progress_bar.set_postfix({
-            'loss': loss.item(),
-            'crop_acc': correct_crops / total_samples,
-            'fert_acc': correct_ferts / total_samples
-        })
+        # Update statistics
+        total_loss += loss.item()
+        progress_bar.set_postfix({"loss": loss.item()})
     
-    # Calculate epoch metrics
-    epoch_loss = epoch_loss / total_samples
-    crop_losses = crop_losses / total_samples
-    fert_losses = fert_losses / total_samples
-    crop_acc = correct_crops / total_samples
-    fert_acc = correct_ferts / total_samples
-    
-    return {
-        'loss': epoch_loss,
-        'crop_loss': crop_losses,
-        'fert_loss': fert_losses,
-        'crop_acc': crop_acc,
-        'fert_acc': fert_acc
-    }
+    return total_loss / len(dataloader)
 
-def validate(model, dataloader, crop_criterion, fert_criterion, device):
+def validate(model, dataloader, criterion, device):
     """Validate the model"""
     model.eval()
-    val_loss = 0
-    crop_losses = 0
-    fert_losses = 0
-    correct_crops = 0
-    correct_ferts = 0
-    total_samples = 0
+    total_loss = 0
     
     with torch.no_grad():
         for batch in dataloader:
-            x, task_id, crop_target, fert_target = batch
-            x, task_id = x.to(device), task_id.to(device)
-            crop_target, fert_target = crop_target.to(device), fert_target.to(device)
+            # Move batch to device
+            prompt = batch['prompt'].to(device)
+            response_input = batch['response_input'].to(device)
+            response_target = batch['response_target'].to(device)
             
             # Forward pass
-            outputs = model(x, task_id)
+            output = model(prompt, response_input)
             
-            # Calculate losses
-            crop_loss = crop_criterion(outputs['crop'], crop_target)
-            fert_loss = fert_criterion(outputs['fertilizer'], fert_target)
-            loss = crop_loss + fert_loss
+            # Reshape for cross entropy
+            output = output.view(-1, output.size(2))
+            response_target = response_target.view(-1)
             
-            # Track metrics
-            val_loss += loss.item() * x.size(0)
-            crop_losses += crop_loss.item() * x.size(0)
-            fert_losses += fert_loss.item() * x.size(0)
+            # Calculate loss
+            loss = criterion(output, response_target)
             
-            # Calculate accuracy
-            _, crop_preds = torch.max(outputs['crop'], 1)
-            _, fert_preds = torch.max(outputs['fertilizer'], 1)
-            correct_crops += (crop_preds == crop_target).sum().item()
-            correct_ferts += (fert_preds == fert_target).sum().item()
-            total_samples += x.size(0)
+            # Update statistics
+            total_loss += loss.item()
     
-    # Calculate validation metrics
-    val_loss = val_loss / total_samples
-    crop_losses = crop_losses / total_samples
-    fert_losses = fert_losses / total_samples
-    crop_acc = correct_crops / total_samples
-    fert_acc = correct_ferts / total_samples
-    
-    return {
-        'loss': val_loss,
-        'crop_loss': crop_losses,
-        'fert_loss': fert_losses,
-        'crop_acc': crop_acc,
-        'fert_acc': fert_acc
-    }
+    return total_loss / len(dataloader)
 
-def test(model, test_dataloader, device):
-    """Evaluate model on test set"""
+def generate_text(model, tokenizer, prompt, max_length=50, device="cpu"):
+    """Generate text using the trained model"""
     model.eval()
-    correct_crops = 0
-    correct_ferts = 0
-    total_samples = 0
     
-    all_crop_preds = []
-    all_crop_targets = []
-    all_fert_preds = []
-    all_fert_targets = []
+    # Tokenize and pad prompt
+    prompt_seq = tokenizer.texts_to_sequences([prompt.lower()])
+    prompt_seq = pad_sequences(prompt_seq, maxlen=MAX_SEQ_LENGTH, padding='post')
+    prompt_tensor = torch.tensor(prompt_seq, dtype=torch.long).to(device)
+    
+    # Encode the prompt
+    prompt_embedded = model.embedding(prompt_tensor)
+    _, (hidden, cell) = model.encoder(prompt_embedded)
+    
+    # Convert encoder hidden state for decoder
+    hidden = hidden.view(NUM_LAYERS, 2, -1, HIDDEN_DIM)
+    hidden = torch.cat([hidden[:, 0], hidden[:, 1]], dim=2)
+    
+    cell = cell.view(NUM_LAYERS, 2, -1, HIDDEN_DIM)
+    cell = torch.cat([cell[:, 0], cell[:, 1]], dim=2)
+    
+    # Start with START token
+    current_token = torch.tensor([[tokenizer.word_index['<START>']]], dtype=torch.long).to(device)
+    
+    # Generate text
+    generated_tokens = []
     
     with torch.no_grad():
-        for batch in test_dataloader:
-            x, task_id, crop_target, fert_target = batch
-            x, task_id = x.to(device), task_id.to(device)
-            crop_target, fert_target = crop_target.to(device), fert_target.to(device)
+        for _ in range(max_length):
+            # Embed current token
+            token_embedded = model.embedding(current_token)
             
-            # Forward pass
-            outputs = model(x, task_id)
+            # Decode one step
+            output, (hidden, cell) = model.decoder(token_embedded, (hidden, cell))
             
-            # Calculate accuracy
-            _, crop_preds = torch.max(outputs['crop'], 1)
-            _, fert_preds = torch.max(outputs['fertilizer'], 1)
+            # Get prediction
+            output = model.output(output)
+            predicted_token = torch.argmax(output, dim=2).item()
             
-            correct_crops += (crop_preds == crop_target).sum().item()
-            correct_ferts += (fert_preds == fert_target).sum().item()
-            total_samples += x.size(0)
+            # Stop if we predict END token
+            if predicted_token == tokenizer.word_index['<END>']:
+                break
+                
+            # Add to generated tokens
+            generated_tokens.append(predicted_token)
             
-            # Store predictions and targets for analysis
-            all_crop_preds.extend(crop_preds.cpu().numpy())
-            all_crop_targets.extend(crop_target.cpu().numpy())
-            all_fert_preds.extend(fert_preds.cpu().numpy())
-            all_fert_targets.extend(fert_target.cpu().numpy())
+            # Update current token
+            current_token = torch.tensor([[predicted_token]], dtype=torch.long).to(device)
     
-    # Calculate test metrics
-    crop_acc = correct_crops / total_samples
-    fert_acc = correct_ferts / total_samples
+    # Convert tokens to text
+    generated_text = tokenizer.sequences_to_texts([generated_tokens])[0]
     
-    logging.info(f"Test Results - Crop Accuracy: {crop_acc:.4f}, Fertilizer Accuracy: {fert_acc:.4f}")
-    
-    # Convert to numpy arrays for analysis
-    all_crop_preds = np.array(all_crop_preds)
-    all_crop_targets = np.array(all_crop_targets)
-    all_fert_preds = np.array(all_fert_preds)
-    all_fert_targets = np.array(all_fert_targets)
-    
-    # Save predictions for further analysis
-    np.savez(
-        'test_predictions.npz',
-        crop_preds=all_crop_preds,
-        crop_targets=all_crop_targets,
-        fert_preds=all_fert_preds,
-        fert_targets=all_fert_targets
-    )
-    
-    return crop_acc, fert_acc
+    return generated_text
 
-def plot_training_history(history, save_path='training_history.png'):
-    """Plot training and validation metrics"""
-    plt.figure(figsize=(15, 10))
-    
-    # Plot loss
-    plt.subplot(2, 2, 1)
+def plot_training_history(history, save_path="nlp_training_history.png"):
+    """Plot training and validation loss"""
+    plt.figure(figsize=(10, 6))
     plt.plot(history['train_loss'], label='Train Loss')
-    plt.plot(history['val_loss'], label='Val Loss')
-    plt.title('Loss Over Time')
+    plt.plot(history['val_loss'], label='Validation Loss')
+    plt.title('Training and Validation Loss')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.legend()
-    
-    # Plot crop accuracy
-    plt.subplot(2, 2, 2)
-    plt.plot(history['train_crop_acc'], label='Train Crop Acc')
-    plt.plot(history['val_crop_acc'], label='Val Crop Acc')
-    plt.title('Crop Accuracy Over Time')
-    plt.xlabel('Epoch')
-    plt.ylabel('Accuracy')
-    plt.legend()
-    
-    # Plot fertilizer accuracy
-    plt.subplot(2, 2, 3)
-    plt.plot(history['train_fert_acc'], label='Train Fert Acc')
-    plt.plot(history['val_fert_acc'], label='Val Fert Acc')
-    plt.title('Fertilizer Accuracy Over Time')
-    plt.xlabel('Epoch')
-    plt.ylabel('Accuracy')
-    plt.legend()
-    
-    # Plot learning rate
-    plt.subplot(2, 2, 4)
-    plt.plot(history['learning_rate'], label='Learning Rate')
-    plt.title('Learning Rate Over Time')
-    plt.xlabel('Epoch')
-    plt.ylabel('Learning Rate')
-    plt.yscale('log')
-    
-    plt.tight_layout()
+    plt.grid(True)
     plt.savefig(save_path)
     plt.close()
 
-def save_model_info(model, input_dim, n_crop_classes, n_fert_classes, train_history, output_dir="model_output"):
-    """Save model information and training history"""
-    # Create output directory if it doesn't exist
-    Path(output_dir).mkdir(exist_ok=True, parents=True)
+def main():
+    parser = argparse.ArgumentParser(description="Train NLP model for agricultural responses")
+    parser.add_argument("--data", type=str, required=True, help="Path to CSV file or directory with prompt-response pairs")
+    parser.add_argument("--output", type=str, default=".", help="Output directory for model and tokenizer")
+    parser.add_argument("--epochs", type=int, default=EPOCHS, help="Number of training epochs")
+    parser.add_argument("--batch-size", type=int, default=BATCH_SIZE, help="Batch size")
+    parser.add_argument("--vocab-size", type=int, default=10000, help="Maximum vocabulary size")
+    parser.add_argument("--cpu", action="store_true", help="Force CPU training")
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
+    args = parser.parse_args()
     
-    # Save model architecture info
-    model_info = {
-        "input_dim": input_dim,
-        "crop_classes": n_crop_classes,
-        "fertilizer_classes": n_fert_classes,
-        "model_params": {
-            "emb_dim": model.feature_embed[0].out_features,
-            "num_layers": len(model.transformer_blocks),
-            "hidden_dim": model.crop_head[2].out_features
-        },
-        "total_params": sum(p.numel() for p in model.parameters()),
-        "trainable_params": sum(p.numel() for p in model.parameters() if p.requires_grad),
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }
+    # Set logging level
+    if args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
     
-    # Save model architecture information
-    with open(os.path.join(output_dir, "model_info.json"), "w") as f:
-        json.dump(model_info, f, indent=4)
+    # Set device
+    device = torch.device("cpu" if args.cpu else ("cuda" if torch.cuda.is_available() else "cpu"))
+    logging.info(f"Using device: {device}")
     
-    # Save training history
-    with open(os.path.join(output_dir, "training_history.json"), "w") as f:
-        json.dump(train_history, f, indent=4)
+    # Load dataset
+    logging.info(f"Loading data from: {args.data}")
+    dataset = load_dataset(args.data)
+    if dataset is None:
+        logging.error("Failed to load dataset. Exiting.")
+        return
     
-    logging.info(f"Model information saved to {output_dir}")
-
-
-def train_model(csv_folder, output_dir="model_output", config=None):
-    """Main training function"""
-    # Set default configuration if not provided
-    if config is None:
-        config = {
-            "batch_size": 32,
-            "learning_rate": 0.001,
-            "epochs": 50,
-            "patience": 10,
-            "weight_decay": 1e-5,
-            "emb_dim": 128,
-            "hidden_dim": 256,
-            "num_heads": 4,
-            "num_layers": 2,
-            "task_emb_dim": 32,
-            "dropout": 0.2,
-            "clip_value": 1.0,
-            "test_size": 0.2,
-            "val_size": 0.1,
-            "device": "cuda" if torch.cuda.is_available() else "cpu"
-        }
+    prompts, responses = dataset
     
-    # Set output directory
-    Path(output_dir).mkdir(exist_ok=True, parents=True)
+    # Create tokenizer
+    tokenizer = create_tokenizer(prompts, responses, max_words=args.vocab_size)
     
-    # Save configuration
-    with open(os.path.join(output_dir, "config.json"), "w") as f:
-        json.dump(config, f, indent=4)
-    
-    # Log configuration
-    logging.info(f"Training configuration: {config}")
-    logging.info(f"Using device: {config['device']}")
-    
-    # Load all CSV files
-    csv_files = load_all_csvs(csv_folder)
-    logging.info(f"Found {len(csv_files)} CSV files in {csv_folder}")
-    
-    # Create datasets
-    train_dataset, val_dataset, test_dataset, input_dim, n_crop_classes, n_fert_classes = create_datasets(
-        csv_files, 
-        test_size=config["test_size"], 
-        val_size=config["val_size"]
+    # Split into train and validation sets
+    train_prompts, val_prompts, train_responses, val_responses = train_test_split(
+        prompts, responses, test_size=0.1, random_state=42
     )
     
-    if train_dataset is None:
-        logging.error("Failed to create datasets, exiting")
-        return
+    # Create datasets
+    train_dataset = AgriNLPDataset(train_prompts, train_responses, tokenizer)
+    val_dataset = AgriNLPDataset(val_prompts, val_responses, tokenizer)
     
     # Create data loaders
     train_loader = DataLoader(
-        train_dataset, 
-        batch_size=config["batch_size"], 
+        train_dataset,
+        batch_size=args.batch_size,
         shuffle=True,
-        num_workers=4,
-        pin_memory=True if config["device"] == "cuda" else False
+        num_workers=4 if device.type == "cuda" else 0
     )
     
     val_loader = DataLoader(
-        val_dataset, 
-        batch_size=config["batch_size"],
+        val_dataset,
+        batch_size=args.batch_size,
         shuffle=False,
-        num_workers=4,
-        pin_memory=True if config["device"] == "cuda" else False
-    )
-    
-    test_loader = DataLoader(
-        test_dataset, 
-        batch_size=config["batch_size"],
-        shuffle=False,
-        num_workers=4
+        num_workers=4 if device.type == "cuda" else 0
     )
     
     # Initialize model
-    model = AgriRecommender(
-        input_dim=input_dim,
-        emb_dim=config["emb_dim"],
-        hidden_dim=config["hidden_dim"],
-        num_heads=config["num_heads"],
-        crop_classes=n_crop_classes,
-        fert_classes=n_fert_classes,
-        num_layers=config["num_layers"],
-        task_embedding_dim=config["task_emb_dim"],
-        dropout=config["dropout"]
+    model = AgriNLPModel(
+        vocab_size=len(tokenizer.word_index),
+        embedding_dim=EMBEDDING_DIM,
+        hidden_dim=HIDDEN_DIM,
+        num_layers=NUM_LAYERS,
+        dropout=DROPOUT
     )
-    model.to(config["device"])
+    model.to(device)
     
-    # Loss functions and optimizer
-    crop_criterion = nn.CrossEntropyLoss()
-    fert_criterion = nn.CrossEntropyLoss()
-    optimizer = optim.AdamW(
-        model.parameters(), 
-        lr=config["learning_rate"],
-        weight_decay=config["weight_decay"]
-    )
-    
-    # Learning rate scheduler
-    scheduler = ReduceLROnPlateau(
-        optimizer,
-        mode='min',
-        factor=0.5,
-        patience=5,
-        verbose=True
-    )
-    
-    # Early stopping
-    checkpoint_path = os.path.join(output_dir, "best_model.pt")
-    early_stopping = EarlyStopping(patience=config["patience"], checkpoint_path=checkpoint_path)
+    # Loss function and optimizer
+    criterion = nn.CrossEntropyLoss(ignore_index=0)  # Ignore padding
+    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
     
     # Training history
     history = {
         'train_loss': [],
-        'val_loss': [],
-        'train_crop_loss': [],
-        'val_crop_loss': [],
-        'train_fert_loss': [],
-        'val_fert_loss': [],
-        'train_crop_acc': [],
-        'val_crop_acc': [],
-        'train_fert_acc': [],
-        'val_fert_acc': [],
-        'learning_rate': []
+        'val_loss': []
     }
     
     # Training loop
-    logging.info("Starting training...")
+    logging.info(f"Starting training for {args.epochs} epochs...")
     start_time = time.time()
     
-    for epoch in range(config["epochs"]):
+    for epoch in range(args.epochs):
         epoch_start = time.time()
         
         # Train
-        train_metrics = train_epoch(
-            model, 
-            train_loader, 
-            optimizer, 
-            crop_criterion, 
-            fert_criterion, 
-            config["device"],
-            config["clip_value"]
-        )
+        train_loss = train_epoch(model, train_loader, criterion, optimizer, device)
         
         # Validate
-        val_metrics = validate(
-            model, 
-            val_loader, 
-            crop_criterion, 
-            fert_criterion, 
-            config["device"]
-        )
-        
-        # Update learning rate
-        scheduler.step(val_metrics['loss'])
-        current_lr = optimizer.param_groups[0]['lr']
-        
-        # Log metrics
-        epoch_time = time.time() - epoch_start
-        logging.info(f"Epoch {epoch+1}/{config['epochs']} - {epoch_time:.2f}s - "
-                    f"Train Loss: {train_metrics['loss']:.4f}, "
-                    f"Val Loss: {val_metrics['loss']:.4f}, "
-                    f"Train Crop Acc: {train_metrics['crop_acc']:.4f}, "
-                    f"Val Crop Acc: {val_metrics['crop_acc']:.4f}, "
-                    f"Train Fert Acc: {train_metrics['fert_acc']:.4f}, "
-                    f"Val Fert Acc: {val_metrics['fert_acc']:.4f}, "
-                    f"LR: {current_lr:.6f}")
+        val_loss = validate(model, val_loader, criterion, device)
         
         # Update history
-        history['train_loss'].append(train_metrics['loss'])
-        history['val_loss'].append(val_metrics['loss'])
-        history['train_crop_loss'].append(train_metrics['crop_loss'])
-        history['val_crop_loss'].append(val_metrics['crop_loss'])
-        history['train_fert_loss'].append(train_metrics['fert_loss'])
-        history['val_fert_loss'].append(val_metrics['fert_loss'])
-        history['train_crop_acc'].append(train_metrics['crop_acc'])
-        history['val_crop_acc'].append(val_metrics['crop_acc'])
-        history['train_fert_acc'].append(train_metrics['fert_acc'])
-        history['val_fert_acc'].append(val_metrics['fert_acc'])
-        history['learning_rate'].append(current_lr)
+        history['train_loss'].append(train_loss)
+        history['val_loss'].append(val_loss)
         
-        # Check early stopping
-        if early_stopping(val_metrics['loss'], model):
-            logging.info(f"Early stopping at epoch {epoch+1}")
-            break
+        # Log progress
+        epoch_time = time.time() - epoch_start
+        logging.info(f"Epoch {epoch+1}/{args.epochs} - {epoch_time:.2f}s - "
+                    f"Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
+        
+        # Generate sample text
+        if (epoch + 1) % 5 == 0 or epoch == args.epochs - 1:
+            sample_prompt = val_prompts[0]
+            sample_response = generate_text(model, tokenizer, sample_prompt, device=device)
+            logging.info(f"Sample generation:")
+            logging.info(f"Prompt: {sample_prompt}")
+            logging.info(f"Generated: {sample_response}")
     
     # Calculate total training time
     total_time = time.time() - start_time
     logging.info(f"Training completed in {total_time:.2f} seconds")
     
-    # Load best model for evaluation
-    model.load_state_dict(torch.load(checkpoint_path))
+    # Save model and tokenizer
+    os.makedirs(args.output, exist_ok=True)
+    model_path = os.path.join(args.output, "agric_nlp_model.pt")
+    tokenizer_path = os.path.join(args.output, "tokenizer.pkl")
     
-    # Evaluate on test set
-    crop_acc, fert_acc = test(model, test_loader, config["device"])
+    torch.save(model.state_dict(), model_path)
+    logging.info(f"Model saved to {model_path}")
     
-    # Save training history plot
-    plot_path = os.path.join(output_dir, "training_history.png")
-    plot_training_history(history, save_path=plot_path)
+    with open(tokenizer_path, 'wb') as f:
+        pickle.dump(tokenizer, f)
+    logging.info(f"Tokenizer saved to {tokenizer_path}")
     
-    # Save final model
-    final_model_path = os.path.join(output_dir, "final_model.pt")
-    torch.save(model.state_dict(), final_model_path)
-    
-    # Save model info and history
-    save_model_info(model, input_dim, n_crop_classes, n_fert_classes, history, output_dir)
-    
-    # Export model to torchscript format for deployment
-    script_model_path = os.path.join(output_dir, "model_scripted.pt")
-    try:
-        # Create example inputs for tracing
-        example_inputs = (
-            torch.randn(1, input_dim, device=config["device"]),
-            torch.tensor([0], device=config["device"])
-        )
-        script_model = torch.jit.trace(model, example_inputs)
-        script_model.save(script_model_path)
-        logging.info(f"TorchScript model saved to {script_model_path}")
-    except Exception as e:
-        logging.error(f"Failed to export TorchScript model: {e}")
-    
-    return model, history, (crop_acc, fert_acc)
-
+    # Plot training history
+    history_path = os.path.join(args.output, "nlp_training_history.png")
+    plot_training_history(history, save_path=history_path)
+    logging.info(f"Training history plot saved to {history_path}")
 
 if __name__ == "__main__":
-    import argparse
-    
-    parser = argparse.ArgumentParser(description="Train agricultural recommendation model")
-    parser.add_argument("--data", type=str, required=True, help="Path to folder containing CSV files")
-    parser.add_argument("--output", type=str, default="model_output", help="Output directory for model and results")
-    parser.add_argument("--config", type=str, default=None, help="Path to JSON config file (optional)")
-    parser.add_argument("--batch-size", type=int, default=32, help="Batch size")
-    parser.add_argument("--epochs", type=int, default=50, help="Number of epochs")
-    parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
-    parser.add_argument("--cpu", action="store_true", help="Force CPU training")
-    
-    args = parser.parse_args()
-    
-    # Load config if provided
-    config = None
-    if args.config:
-        with open(args.config, 'r') as f:
-            config = json.load(f)
-    else:
-        # Create config from command line args
-        config = {
-            "batch_size": args.batch_size,
-            "learning_rate": args.lr,
-            "epochs": args.epochs,
-            "patience": 10,
-            "weight_decay": 1e-5,
-            "emb_dim": 128,
-            "hidden_dim": 256,
-            "num_heads": 4,
-            "num_layers": 2,
-            "task_emb_dim": 32,
-            "dropout": 0.2,
-            "clip_value": 1.0,
-            "test_size": 0.2,
-            "val_size": 0.1,
-            "device": "cpu" if args.cpu else ("cuda" if torch.cuda.is_available() else "cpu")
-        }
-    
-    # Run training
-    train_model(args.data, args.output, config)
+    main()

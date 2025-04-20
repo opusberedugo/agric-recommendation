@@ -1,8 +1,7 @@
 # prompt.py
 """
-Enhanced prompt processing for agricultural recommendations using pure AI approach.
-This version uses NLP techniques to understand and process natural language queries
-without relying on a database of predefined values.
+Agricultural recommendation system that processes natural language queries.
+Uses a PyTorch model for recommendations and an LSTM-based NLP system for responses.
 """
 
 import torch
@@ -13,6 +12,7 @@ import sys
 import re
 import numpy as np
 from sklearn.preprocessing import StandardScaler
+import pickle
 from model import AgriRecommender
 
 # Path configurations
@@ -20,6 +20,12 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_DIR = os.path.join(BASE_DIR, "models", "agri_model")
 MODEL_PATH = os.path.join(MODEL_DIR, "best_model.pt")
 MODEL_INFO_PATH = os.path.join(MODEL_DIR, "model_info.json")
+NLP_MODEL_PATH = os.path.join(BASE_DIR, "agric_nlp_model.pt")
+TOKENIZER_PATH = os.path.join(BASE_DIR, "tokenizer.pkl")
+
+# Constants
+MAX_LEN = 100  # Maximum sequence length for NLP model
+MAX_RESPONSE_LEN = 50  # Maximum length of generated responses
 
 # Common crops and fertilizers for text matching
 COMMON_CROPS = [
@@ -31,6 +37,60 @@ COMMON_FERTILIZERS = [
     "urea", "dap", "npk", "mop", "ammonium sulfate", "ammonium sulphate", 
     "super phosphate", "potash", "calcium nitrate"
 ]
+
+class SimpleNLPModel(torch.nn.Module):
+    """A simple PyTorch-based NLP model for text generation"""
+    def __init__(self, vocab_size, embedding_dim=128, hidden_dim=256, output_dim=None):
+        super(SimpleNLPModel, self).__init__()
+        self.output_dim = output_dim or vocab_size
+        
+        # Embedding layer
+        self.embedding = torch.nn.Embedding(vocab_size, embedding_dim)
+        
+        # LSTM layer
+        self.lstm = torch.nn.LSTM(
+            input_size=embedding_dim,
+            hidden_size=hidden_dim,
+            num_layers=2,
+            batch_first=True,
+            dropout=0.2
+        )
+        
+        # Output layer
+        self.output = torch.nn.Linear(hidden_dim, self.output_dim)
+        
+    def forward(self, x, hidden=None):
+        # Embedding
+        embedded = self.embedding(x)
+        
+        # LSTM
+        if hidden is None:
+            output, hidden = self.lstm(embedded)
+        else:
+            output, hidden = self.lstm(embedded, hidden)
+        
+        # Output layer
+        predictions = self.output(output)
+        
+        return predictions, hidden
+
+
+def pad_sequences(sequences, maxlen, padding='post', value=0):
+    """Simple implementation of padding sequences"""
+    padded_sequences = []
+    for seq in sequences:
+        if len(seq) > maxlen:
+            # Truncate
+            padded_seq = seq[:maxlen]
+        else:
+            # Pad
+            if padding == 'post':
+                padded_seq = seq + [value] * (maxlen - len(seq))
+            else:  # 'pre'
+                padded_seq = [value] * (maxlen - len(seq)) + seq
+        padded_sequences.append(padded_seq)
+    return padded_sequences
+
 
 def load_model_info(model_info_path=None):
     """Load model architecture information"""
@@ -85,6 +145,29 @@ def load_model(model_path=None, model_info_path=None, device="cpu"):
     model.eval()
     
     return model, model_info
+
+def load_nlp_model():
+    """Load the PyTorch NLP model and tokenizer if available"""
+    # Check if the NLP model exists
+    if not os.path.exists(NLP_MODEL_PATH) or not os.path.exists(TOKENIZER_PATH):
+        print("NLP model or tokenizer not found. Only using base recommendation model.")
+        return None, None
+    
+    try:
+        # Load the tokenizer first to get vocabulary size
+        with open(TOKENIZER_PATH, "rb") as f:
+            tokenizer = pickle.load(f)
+        
+        # Create and load the model
+        vocab_size = len(tokenizer.word_index) + 1  # +1 for padding/unknown
+        nlp_model = SimpleNLPModel(vocab_size)
+        nlp_model.load_state_dict(torch.load(NLP_MODEL_PATH))
+        nlp_model.eval()
+        
+        return nlp_model, tokenizer
+    except Exception as e:
+        print(f"Error loading NLP model: {e}")
+        return None, None
 
 def analyze_query(query_text):
     """
@@ -183,7 +266,6 @@ def generate_features_from_query(query_text, input_dim=4):
             feature_vector[i] = query_analysis['soil_params'][param]
     
     # If the query is about a specific crop, adjust the feature vector
-    # Instead of using fixed database values, we'll modify features based on crop type
     if query_analysis['found_crop']:
         crop = query_analysis['found_crop']
         
@@ -247,7 +329,71 @@ def generate_features_from_query(query_text, input_dim=4):
     
     return torch.tensor(normalized_vector, dtype=torch.float32), query_analysis['task_id'], query_analysis
 
-def predict(query_text, task_id=None, device="cpu", model_path=None, model_info_path=None):
+def generate_nlp_response(query, tokenizer, nlp_model, max_length=MAX_RESPONSE_LEN):
+    """
+    Generate a natural language response using the PyTorch NLP model.
+    
+    Args:
+        query (str): The user's query
+        tokenizer: The tokenizer used for text processing
+        nlp_model: The NLP model for text generation
+        max_length (int): Maximum response length
+        
+    Returns:
+        str: Generated natural language response
+    """
+    if nlp_model is None or tokenizer is None:
+        return None
+    
+    try:
+        # Convert query to sequence
+        input_seq = tokenizer.texts_to_sequences([query.lower()])
+        # Pad the sequence
+        input_pad = pad_sequences(input_seq, maxlen=MAX_LEN, padding='post')
+        
+        # Convert to PyTorch tensor
+        input_tensor = torch.tensor(input_pad, dtype=torch.long)
+        
+        # Initialize the response
+        response = []
+        
+        # Generate the response word by word
+        with torch.no_grad():
+            for i in range(max_length):
+                # Predict the next token
+                prediction, hidden = nlp_model(input_tensor)
+                
+                # Get the prediction from the last time step
+                last_time_step = prediction[:, -1, :]
+                output_idx = torch.argmax(last_time_step, dim=1).item()
+                
+                # Convert the token ID to a word
+                word = None
+                for token, idx in tokenizer.word_index.items():
+                    if idx == output_idx:
+                        word = token
+                        break
+                
+                # Stop if we generated an end token or couldn't find the word
+                if word is None or word == '<END>':
+                    break
+                    
+                # Add the predicted word to the response
+                if word != '<START>':
+                    response.append(word)
+                
+                # Update the sequence for the next prediction
+                new_input = tokenizer.texts_to_sequences([' '.join(response)])
+                new_input_pad = pad_sequences(new_input, maxlen=MAX_LEN, padding='post')
+                input_tensor = torch.tensor(new_input_pad, dtype=torch.long)
+        
+        # Join the words to form the response
+        return ' '.join(response)
+    except Exception as e:
+        print(f"Error generating NLP response: {e}")
+        return None
+
+def predict_recommendation(query_text, task_id=None, device="cpu", model_path=None, model_info_path=None):
     """
     Get agricultural recommendations from natural language query.
     
@@ -349,72 +495,56 @@ def get_fertilizer_name(fert_id):
     }
     return fertilizer_names.get(fert_id, f"Fertilizer {fert_id}")
 
-def main():
-    parser = argparse.ArgumentParser(description="Agricultural recommendation system using natural language queries.")
-    parser.add_argument("--question", type=str, required=True, help="Your agricultural question (e.g., 'What's the best fertilizer for rice?')")
-    parser.add_argument("--task", type=int, default=None, help="Force task ID (0: crop recommendation, 1: fertilizer recommendation, None: auto-detect)")
-    parser.add_argument("--device", type=str, default="cpu", help="Device to use (cpu/cuda)")
-    parser.add_argument("--model-dir", type=str, default=None, help="Custom model directory path")
-    args = parser.parse_args()
-
-    # Set up model paths based on arguments
-    model_path = None
-    model_info_path = None
+def generate_complete_response(query, recommendation_result, nlp_response):
+    """
+    Generate a complete response combining the model recommendation with NLP explanation.
     
-    if args.model_dir:
-        model_path = os.path.join(args.model_dir, "best_model.pt")
-        model_info_path = os.path.join(args.model_dir, "model_info.json")
-
-    try:
-        # Check if models directory exists
-        if not os.path.exists(MODEL_DIR):
-            print(f"❌ Model directory not found at {MODEL_DIR}")
-            print("Please make sure your directory structure is correct or provide a valid model directory with --model-dir")
-            sys.exit(1)
-            
-        # Run prediction with the query
-        result = predict(args.question, args.task, args.device, model_path, model_info_path)
+    Args:
+        query (str): Original user query
+        recommendation_result (dict): Result from the recommendation model
+        nlp_response (str): Generated NLP response or None
         
-        # Get human-readable names
-        if result["recommendation_type"] == "crop":
-            prediction_name = get_crop_name(result["prediction"])
-            rec_type = "Crop"
-        else:
-            prediction_name = get_fertilizer_name(result["prediction"])
-            rec_type = "Fertilizer"
-        
-        # Check what was found in the query
-        query_analysis = result.get("query_analysis", {})
-        found_crop = query_analysis.get("found_crop")
-        found_fertilizer = query_analysis.get("found_fertilizer")
-            
-        # Print user-friendly output
-        print("\n" + "="*50)
-        print(f"🧠 {rec_type} Recommendation for: '{args.question}'")
-        print("="*50)
-        
-        # If the user asked about a specific crop/fertilizer, acknowledge it
-        if found_crop:
-            print(f"► Detected crop in query: {found_crop.capitalize()}")
-        if found_fertilizer:
-            print(f"► Detected fertilizer in query: {found_fertilizer.upper() if found_fertilizer.lower() == 'npk' else found_fertilizer.capitalize()}")
-            
-        # Main recommendation
-        print(f"► Recommended: {prediction_name}")
-        print(f"► Confidence: {result['confidence']:.2f}")
-        print("="*50)
-        
-        # Print top recommendations
-        if "top_predictions" in result:
-            print("\nTop Recommendations:")
-            for i, (pred_id, confidence) in enumerate(result["top_predictions"]):
-                name = get_crop_name(pred_id) if result["recommendation_type"] == "crop" else get_fertilizer_name(pred_id)
-                print(f"{i+1}. {name} (confidence: {confidence:.2f})")
-        
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        import traceback
-        traceback.print_exc()
-
-if __name__ == "__main__":
-    main()
+    Returns:
+        str: Complete formatted response
+    """
+    # Get recommendation type and name
+    if recommendation_result["recommendation_type"] == "crop":
+        prediction_name = get_crop_name(recommendation_result["prediction"])
+        rec_type = "Crop"
+    else:
+        prediction_name = get_fertilizer_name(recommendation_result["prediction"])
+        rec_type = "Fertilizer"
+    
+    # Extract detected entities
+    query_analysis = recommendation_result.get("query_analysis", {})
+    found_crop = query_analysis.get("found_crop")
+    found_fertilizer = query_analysis.get("found_fertilizer")
+    
+    # Start building the response
+    response = [f"📊 {rec_type} Recommendation"]
+    
+    # Mention detected crop/fertilizer if any
+    if found_crop:
+        response.append(f"I noticed you mentioned {found_crop.capitalize()}.")
+    if found_fertilizer:
+        response.append(f"I noticed you mentioned {found_fertilizer.upper() if found_fertilizer.lower() == 'npk' else found_fertilizer.capitalize()}.")
+    
+    # Add the main recommendation
+    response.append(f"Based on the information provided, I recommend: {prediction_name} (confidence: {recommendation_result['confidence']:.2f})")
+    
+    # Add top alternative recommendations
+    alternatives = []
+    for i, (pred_id, confidence) in enumerate(recommendation_result["top_predictions"][1:], 1):  # Skip the first one as it's already shown
+        name = get_crop_name(pred_id) if recommendation_result["recommendation_type"] == "crop" else get_fertilizer_name(pred_id)
+        alternatives.append(f"{name} (confidence: {confidence:.2f})")
+    
+    if alternatives:
+        response.append("Alternative recommendations: " + ", ".join(alternatives))
+    
+    # Add NLP explanation if available
+    if nlp_response:
+        response.append("\n💬 Additional Information:")
+        response.append(nlp_response)
+    
+    # Return the complete response
+    return "\n".join(response)
