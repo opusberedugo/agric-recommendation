@@ -15,3 +15,42 @@ python predict.py
 ??
 
 python train.py --data dataset/ --output models/agri_model
+
+//////////////////////////
+
+
+# Analyze and prepare the dataset from different sources
+python prepare_data.py --input dataset/Crop\ Recommendation dataset/Fertilizer\ Recommendation --output dataset/combined_dataset.csv --analyze
+
+# Check the distribution of crops and fertilizers in the prepared dataset
+python prepare_data.py --input dataset/combined_dataset.csv --analyze
+
+
+# Train the model with default parameters
+python enhanced_train.py --data dataset/combined_dataset.csv --output-dir models/agri_model
+
+# Advanced training with additional parameters
+python enhanced_train.py --data dataset/combined_dataset.csv --output-dir models/agri_model --batch-size 64 --epochs 100 --patience 15 --lr 0.0005 --emb-dim 192 --hidden-dim 384 --num-layers 4 --augment
+
+# Run in interactive command-line mode to ask questions
+python enhanced_inference.py --interactive
+
+# Start the API server
+uvicorn enhanced_api:app --host 0.0.0.0 --port 8000 --reload
+
+# In a production environment
+uvicorn enhanced_api:app --host 0.0.0.0 --port 8000 --workers 4
+
+
+method 2
+# 1. Prepare dataset
+python prepare_data.py --input dataset/ --output dataset/combined_dataset.csv --analyze
+
+# 2. Train model
+python enhanced_train.py --data dataset/combined_dataset.csv --output-dir models/agri_model --epochs 50 --batch-size 32
+
+# 3. Test with interactive mode
+python enhanced_inference.py --interactive
+
+# 4. Start API server
+uvicorn enhanced_api:app --host 0.0.0.0 --port 8000
