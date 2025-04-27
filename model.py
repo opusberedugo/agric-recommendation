@@ -21,16 +21,13 @@ class SoilFeatureEncoder(nn.Module):
         self.input_dim = input_dim
         self.output_dim = output_dim
         
-        # Main feature extraction pathway
-        self.main_path = nn.Sequential(
-            nn.Linear(input_dim, output_dim * 2),
-            nn.BatchNorm1d(output_dim * 2),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(output_dim * 2, output_dim),
-            nn.BatchNorm1d(output_dim),
-            nn.ReLU(),
-        )
+        # Main feature extraction pathway - replaced BatchNorm with LayerNorm
+        # to avoid issues with small batch sizes
+        self.feature_linear1 = nn.Linear(input_dim, output_dim * 2)
+        self.layer_norm1 = nn.LayerNorm(output_dim * 2)
+        self.feature_linear2 = nn.Linear(output_dim * 2, output_dim)
+        self.layer_norm2 = nn.LayerNorm(output_dim)
+        self.dropout = nn.Dropout(dropout)
         
         # Special NPK interaction module
         self.npk_module = nn.Sequential(
@@ -45,7 +42,14 @@ class SoilFeatureEncoder(nn.Module):
         
     def forward(self, x):
         # Main feature extraction
-        main_features = self.main_path(x)
+        x1 = self.feature_linear1(x)
+        x1 = self.layer_norm1(x1)
+        x1 = F.relu(x1)
+        x1 = self.dropout(x1)
+        
+        x1 = self.feature_linear2(x1)
+        x1 = self.layer_norm2(x1)
+        main_features = F.relu(x1)
         
         # Extract and process NPK interactions
         # Assuming first 3 features are N, P, K
@@ -207,10 +211,14 @@ class EnhancedAgriRecommender(nn.Module):
             nn.GELU(),
         )
         
+        # Fixed: Ensure the output dimensions are never zero by using max(1, value)
+        n_classes = max(1, fert_classes // 2)
+        pk_classes = max(1, fert_classes - n_classes)
+        
         # Specialized fertilizer outputs for different nutrient needs
-        self.fert_n_layer = nn.Linear(hidden_dim, fert_classes // 2)
-        self.fert_pk_layer = nn.Linear(hidden_dim, fert_classes // 2)
-        self.fert_combine = nn.Linear(fert_classes, fert_classes)
+        self.fert_n_layer = nn.Linear(hidden_dim, n_classes)
+        self.fert_pk_layer = nn.Linear(hidden_dim, pk_classes)
+        self.fert_combine = nn.Linear(n_classes + pk_classes, fert_classes)
         
         # Optional text generation for explanations (e.g., "This crop is recommended because...")
         self.explanation_generator = nn.GRU(
@@ -271,6 +279,8 @@ class EnhancedAgriRecommender(nn.Module):
         fert_features = self.fert_common(embedding)
         fert_n_logits = self.fert_n_layer(fert_features)
         fert_pk_logits = self.fert_pk_layer(fert_features)
+        
+        # Fixed: Ensure tensor dimensions are correct before concatenation
         fert_combined = torch.cat([fert_n_logits, fert_pk_logits], dim=1)
         fert_logits = self.fert_combine(fert_combined)
         
@@ -333,7 +343,7 @@ class AgriMultiTaskModel(nn.Module):
             nn.Linear(emb_dim, hidden_dim),
             nn.GELU(),
             nn.Dropout(dropout),
-            nn.Linear(hidden_dim, crop_classes)
+            nn.Linear(hidden_dim, max(1, crop_classes))  # Ensure at least 1 class
         )
         
         self.fert_head = nn.Sequential(
@@ -341,7 +351,7 @@ class AgriMultiTaskModel(nn.Module):
             nn.Linear(emb_dim, hidden_dim),
             nn.GELU(),
             nn.Dropout(dropout),
-            nn.Linear(hidden_dim, fert_classes)
+            nn.Linear(hidden_dim, max(1, fert_classes))  # Ensure at least 1 class
         )
         
         self.climate_head = nn.Sequential(
@@ -349,7 +359,7 @@ class AgriMultiTaskModel(nn.Module):
             nn.Linear(emb_dim, hidden_dim),
             nn.GELU(),
             nn.Dropout(dropout),
-            nn.Linear(hidden_dim, climate_effect_classes)
+            nn.Linear(hidden_dim, max(1, climate_effect_classes))  # Ensure at least 1 class
         )
         
         self.yield_head = nn.Sequential(
@@ -414,8 +424,8 @@ def predict_with_confidence(model, features, task_id, device='cpu'):
         fert_conf, fert_pred = torch.max(fert_probs, dim=1)
         
         # Get top 3 predictions for each task
-        _, top3_crop_indices = torch.topk(crop_probs, 3, dim=1)
-        _, top3_fert_indices = torch.topk(fert_probs, 3, dim=1)
+        _, top3_crop_indices = torch.topk(crop_probs, min(3, crop_probs.size(1)), dim=1)
+        _, top3_fert_indices = torch.topk(fert_probs, min(3, fert_probs.size(1)), dim=1)
         
         top3_crop_probs = torch.gather(crop_probs, 1, top3_crop_indices)
         top3_fert_probs = torch.gather(fert_probs, 1, top3_fert_indices)
