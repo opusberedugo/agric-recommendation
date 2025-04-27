@@ -2,3 +2,6 @@ __pycache__
 datasets.old
 dataset
 sets
+models
+models.old
+test_data

@@ -9,12 +9,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader, random_split, WeightedRandomSampler
+from torch.utils.data import Dataset, DataLoader, random_split
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
-import seaborn as sns
 import json
 import argparse
 import logging
@@ -23,10 +21,6 @@ from tqdm import tqdm
 import glob
 from collections import Counter
 from model import EnhancedAgriRecommender, AgriMultiTaskModel
-
-# Set environment variables to avoid multiprocessing issues
-os.environ["OMP_NUM_THREADS"] = "1"
-os.environ["MKL_NUM_THREADS"] = "1"
 
 # Configure logging
 logging.basicConfig(
@@ -79,7 +73,8 @@ class AgriDataset(Dataset):
         
         # Normalize features
         self.scaler = StandardScaler()
-        self.df[self.feature_cols] = self.scaler.fit_transform(self.df[self.feature_cols])
+        if self.feature_cols and len(self.df) > 0:  # Check if feature columns exist and dataframe is not empty
+            self.df[self.feature_cols] = self.scaler.fit_transform(self.df[self.feature_cols])
         
         # Save dimensions
         self.input_dim = len(self.feature_cols)
@@ -89,7 +84,7 @@ class AgriDataset(Dataset):
         
         # Store class mappings
         self.crop_mapping = {i: cls for i, cls in enumerate(self.label_enc_crop.classes_)} if hasattr(self.label_enc_crop, 'classes_') else {}
-        self.fert_mapping = {i: cls for i, cls in enumerate(self.label_enc_fert.classes_)} if hasattr(self.label_enc_fert, 'classes_') else {}
+        self.fertilizer_mapping = {i: cls for i, cls in enumerate(self.label_enc_fert.classes_)} if hasattr(self.label_enc_fert, 'classes_') else {}
         
         # Check for class imbalance
         if 'crop_label' in self.df.columns:
@@ -151,7 +146,7 @@ class AgriDataset(Dataset):
             'climate_classes': self.climate_classes if hasattr(self, 'climate_classes') else 0,
             'feature_names': self.feature_cols,
             'crop_mapping': self.crop_mapping,
-            'fertilizer_mapping': self.fert_mapping
+            'fertilizer_mapping': self.fertilizer_mapping
         }
 
 
@@ -169,6 +164,7 @@ def find_csv_files(path):
     
     return csv_files
 
+
 def infer_task_id(file_path):
     """Infer task ID from file path or content"""
     filename = os.path.basename(file_path).lower()
@@ -184,6 +180,7 @@ def infer_task_id(file_path):
     
     # If we can't determine from filename, return default
     return 0
+
 
 def standardize_columns(df):
     """Standardize column names across different datasets"""
@@ -243,6 +240,7 @@ def standardize_columns(df):
             df = df.rename(columns={col: f'feature_{col}'})
     
     return df
+
 
 def load_dataset(paths, verbose=False):
     """
@@ -344,6 +342,7 @@ def load_dataset(paths, verbose=False):
     
     return combined_df
 
+
 def train_model(train_loader, val_loader, model, criterion, optimizer, scheduler, device, epochs=30, patience=5):
     """
     Train the model with early stopping, learning rate scheduling, and gradient clipping
@@ -394,8 +393,7 @@ def train_model(train_loader, val_loader, model, criterion, optimizer, scheduler
             crop_loss = criterion['crop'](outputs['crop'], crop_labels)
             fert_loss = criterion['fertilizer'](outputs['fertilizer'], fert_labels)
             
-            # Combine losses based on task_id
-            # If task_id=0, focus more on crop loss; if task_id=1, focus more on fertilizer loss
+            # Combine losses
             batch_loss = crop_loss + fert_loss
             
             # Backward pass
@@ -421,14 +419,14 @@ def train_model(train_loader, val_loader, model, criterion, optimizer, scheduler
             # Update progress bar
             progress_bar.set_postfix({
                 'loss': batch_loss.item(),
-                'crop_acc': train_crop_correct / train_samples,
-                'fert_acc': train_fert_correct / train_samples
+                'crop_acc': train_crop_correct / (train_samples + 1e-8),
+                'fert_acc': train_fert_correct / (train_samples + 1e-8)
             })
         
         # Calculate average training metrics
-        train_loss = train_loss / train_samples
-        train_crop_acc = train_crop_correct / train_samples
-        train_fert_acc = train_fert_correct / train_samples
+        train_loss = train_loss / (train_samples + 1e-8)
+        train_crop_acc = train_crop_correct / (train_samples + 1e-8)
+        train_fert_acc = train_fert_correct / (train_samples + 1e-8)
         
         # Validation phase
         model.eval()
@@ -465,9 +463,9 @@ def train_model(train_loader, val_loader, model, criterion, optimizer, scheduler
                 val_samples += features.size(0)
         
         # Calculate average validation metrics
-        val_loss = val_loss / val_samples
-        val_crop_acc = val_crop_correct / val_samples
-        val_fert_acc = val_fert_correct / val_samples
+        val_loss = val_loss / (val_samples + 1e-8)
+        val_crop_acc = val_crop_correct / (val_samples + 1e-8)
+        val_fert_acc = val_fert_correct / (val_samples + 1e-8)
         
         # Update learning rate
         current_lr = optimizer.param_groups[0]['lr']
@@ -508,10 +506,12 @@ def train_model(train_loader, val_loader, model, criterion, optimizer, scheduler
                 break
     
     # Load the best model
-    model.load_state_dict(best_model_state)
+    if best_model_state is not None:
+        model.load_state_dict(best_model_state)
     logging.info(f"Training completed. Best model was from epoch {best_epoch+1}")
     
     return model, history
+
 
 def plot_training_history(history, save_path="training_history.png"):
     """Plot training history metrics"""
@@ -562,6 +562,7 @@ def plot_training_history(history, save_path="training_history.png"):
 
 
 def main():
+    """Main entry point for training"""
     parser = argparse.ArgumentParser(description="Train agricultural recommendation model")
     parser.add_argument("--data", type=str, required=True, help="Path to data directory or CSV file")
     parser.add_argument("--model-type", type=str, default="enhanced", choices=["enhanced", "multitask"], help="Model type to use")
@@ -613,12 +614,12 @@ def main():
     logging.info(f"Training set size: {len(train_dataset)}")
     logging.info(f"Validation set size: {len(val_dataset)}")
     
-    # Create data loaders with 0 workers to avoid multiprocessing issues
+    # Create data loaders
     train_loader = DataLoader(
         train_dataset, 
         batch_size=args.batch_size, 
         shuffle=True,
-        num_workers=0,  # Changed from 4 to 0 to fix pickling error
+        num_workers=0,
         pin_memory=device.type == "cuda"
     )
     
@@ -626,7 +627,7 @@ def main():
         val_dataset, 
         batch_size=args.batch_size, 
         shuffle=False,
-        num_workers=0,  # Changed from 4 to 0 to fix pickling error
+        num_workers=0,
         pin_memory=device.type == "cuda"
     )
     
@@ -659,7 +660,7 @@ def main():
     model.to(device)
     logging.info(f"Initialized {args.model_type} model with {sum(p.numel() for p in model.parameters())} parameters")
     
-    # Initialize loss functions with class weighting if needed
+    # Initialize loss functions
     criterion = {
         'crop': nn.CrossEntropyLoss(),
         'fertilizer': nn.CrossEntropyLoss()
@@ -689,14 +690,14 @@ def main():
     torch.save(trained_model.state_dict(), model_path)
     logging.info(f"Model saved to {model_path}")
     
-    # Save model info
+    # Save model info with safe dict access
     model_info = {
         "input_dim": meta_info['input_dim'],
         "crop_classes": meta_info['crop_classes'],
         "fertilizer_classes": meta_info['fertilizer_classes'],
-        "feature_names": meta_info['feature_names'],
-        "crop_mapping": meta_info['crop_mapping'],
-        "fertilizer_mapping": meta_info['fert_mapping'],
+        "feature_names": meta_info.get('feature_names', []),
+        "crop_mapping": meta_info.get('crop_mapping', {}),
+        "fertilizer_mapping": meta_info.get('fertilizer_mapping', {}),
         "model_params": {
             "emb_dim": args.emb_dim,
             "hidden_dim": args.hidden_dim,
@@ -713,6 +714,7 @@ def main():
     # Save training history
     with open(os.path.join(args.output_dir, "training_history.json"), 'w') as f:
         json.dump(history, f, indent=2)
+    
     # Plot training history
     plot_training_history(history, save_path=os.path.join(args.output_dir, "training_history.png"))
     
@@ -728,6 +730,7 @@ def main():
     logging.info(f"  Best fertilizer accuracy: {max(history['val_fert_acc']):.4f}")
     
     return 0
+
 
 if __name__ == "__main__":
     exit(main())

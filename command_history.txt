@@ -1,0 +1,10 @@
+python prepare_data.py --input dataset/ --output dataset/combined_dataset.csv --analyze
+python prepare_data.py --input test_data/ --output dataset/combined_dataset.csv --analyze
+python enhanced_train.py --data dataset/combined_dataset.csv --output-dir models/agri_model --epochs 50 --batch-size 32
+code .
+python train.py --data dataset/combined_dataset.csv --output-dir models/agri_model --epochs 50 --batch-size 32
+python inference.py --interactive
+python api.py
+cls
+uvicorn api:app --host 0.0.0.0 --port 8000
+doskey /history > command_history.txt

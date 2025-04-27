@@ -47,10 +47,10 @@ method 2
 python prepare_data.py --input dataset/ --output dataset/combined_dataset.csv --analyze
 
 # 2. Train model
-python enhanced_train.py --data dataset/combined_dataset.csv --output-dir models/agri_model --epochs 50 --batch-size 32
+python train.py --data dataset/combined_dataset.csv --output-dir models/agri_model --epochs 50 --batch-size 32
 
 # 3. Test with interactive mode
-python enhanced_inference.py --interactive
+python inference.py --interactive
 
 # 4. Start API server
-uvicorn enhanced_api:app --host 0.0.0.0 --port 8000
+uvicorn api:app --host 0.0.0.0 --port 8000

@@ -112,3 +112,81 @@
 2025-04-27 07:39:59,636 - INFO - Validation set size: 2841
 2025-04-27 07:39:59,650 - INFO - Initialized enhanced model with 943050 parameters
 2025-04-27 07:40:01,105 - INFO - Starting training for 50 epochs
+2025-04-27 07:46:59,710 - INFO - Using device: cpu
+2025-04-27 07:46:59,710 - INFO - Found 1 CSV files in dataset/combined_dataset.csv
+2025-04-27 07:46:59,757 - INFO - Combined dataset has 14202 rows
+2025-04-27 07:46:59,764 - INFO - Loaded dataset with shape: (14202, 31)
+2025-04-27 07:46:59,785 - INFO - Crop class distribution: Counter({0: 14202})
+2025-04-27 07:46:59,786 - INFO - Fertilizer class distribution: Counter({0: 14202})
+2025-04-27 07:46:59,786 - INFO - Dataset metadata: {'input_dim': 28, 'crop_classes': 1, 'fertilizer_classes': 1, 'climate_classes': 0, 'feature_names': ['feature_Unnamed: 0', 'feature_Crop', 'feature_N', 'feature_P', 'feature_K', 'feature_pH', 'feature_Temperature', 'feature_Humidity', 'feature_Soil Moisture', 'feature_Soil Type', 'feature_Crop Type', 'feature_Nitrogen', 'feature_Potassium', 'feature_Phosphorus', 'feature_Fertilizer', 'feature_Temparature', 'feature_Moisture', 'feature_Soil_Type', 'feature_Crop_Type', 'feature_Phosphorous', 'feature_Humidity ', 'feature_Fertilizer Name', 'feature_soil_moisture', 'feature_Rainfall', 'feature_PH', 'feature_Carbon', 'feature_Soil', 'feature_Remark'], 'crop_mapping': {0: 'Unknown'}, 'fertilizer_mapping': {0: 'Unknown'}}
+2025-04-27 07:46:59,787 - INFO - Training set size: 11361
+2025-04-27 07:46:59,788 - INFO - Validation set size: 2841
+2025-04-27 07:46:59,803 - INFO - Initialized enhanced model with 943050 parameters
+2025-04-27 07:47:00,943 - INFO - Starting training for 50 epochs
+2025-04-27 07:47:32,548 - INFO - Epoch 1/50 - Train Loss: 0.0000, Val Loss: 0.0000, Train Crop Acc: 1.0000, Val Crop Acc: 1.0000, Train Fert Acc: 1.0000, Val Fert Acc: 1.0000, LR: 0.001000
+2025-04-27 07:47:32,551 - INFO - New best model at epoch 1
+2025-04-27 07:48:01,087 - INFO - Epoch 2/50 - Train Loss: 0.0000, Val Loss: 0.0000, Train Crop Acc: 1.0000, Val Crop Acc: 1.0000, Train Fert Acc: 1.0000, Val Fert Acc: 1.0000, LR: 0.001000
+2025-04-27 07:48:01,087 - INFO - No improvement for 1 epochs
+2025-04-27 07:48:24,068 - INFO - Epoch 3/50 - Train Loss: 0.0000, Val Loss: 0.0000, Train Crop Acc: 1.0000, Val Crop Acc: 1.0000, Train Fert Acc: 1.0000, Val Fert Acc: 1.0000, LR: 0.001000
+2025-04-27 07:48:24,069 - INFO - No improvement for 2 epochs
+2025-04-27 07:48:53,334 - INFO - Epoch 4/50 - Train Loss: 0.0000, Val Loss: 0.0000, Train Crop Acc: 1.0000, Val Crop Acc: 1.0000, Train Fert Acc: 1.0000, Val Fert Acc: 1.0000, LR: 0.001000
+2025-04-27 07:48:53,335 - INFO - No improvement for 3 epochs
+2025-04-27 07:49:25,539 - INFO - Epoch 5/50 - Train Loss: 0.0000, Val Loss: 0.0000, Train Crop Acc: 1.0000, Val Crop Acc: 1.0000, Train Fert Acc: 1.0000, Val Fert Acc: 1.0000, LR: 0.001000
+2025-04-27 07:49:25,539 - INFO - No improvement for 4 epochs
+2025-04-27 07:49:51,349 - INFO - Epoch 6/50 - Train Loss: 0.0000, Val Loss: 0.0000, Train Crop Acc: 1.0000, Val Crop Acc: 1.0000, Train Fert Acc: 1.0000, Val Fert Acc: 1.0000, LR: 0.001000
+2025-04-27 07:49:51,349 - INFO - No improvement for 5 epochs
+2025-04-27 07:50:20,860 - INFO - Epoch 7/50 - Train Loss: 0.0000, Val Loss: 0.0000, Train Crop Acc: 1.0000, Val Crop Acc: 1.0000, Train Fert Acc: 1.0000, Val Fert Acc: 1.0000, LR: 0.001000
+2025-04-27 07:50:20,861 - INFO - No improvement for 6 epochs
+2025-04-27 07:50:51,479 - INFO - Epoch 8/50 - Train Loss: 0.0000, Val Loss: 0.0000, Train Crop Acc: 1.0000, Val Crop Acc: 1.0000, Train Fert Acc: 1.0000, Val Fert Acc: 1.0000, LR: 0.000500
+2025-04-27 07:50:51,479 - INFO - No improvement for 7 epochs
+2025-04-27 07:51:21,048 - INFO - Epoch 9/50 - Train Loss: 0.0000, Val Loss: 0.0000, Train Crop Acc: 1.0000, Val Crop Acc: 1.0000, Train Fert Acc: 1.0000, Val Fert Acc: 1.0000, LR: 0.000500
+2025-04-27 07:51:21,049 - INFO - No improvement for 8 epochs
+2025-04-27 07:51:49,651 - INFO - Epoch 10/50 - Train Loss: 0.0000, Val Loss: 0.0000, Train Crop Acc: 1.0000, Val Crop Acc: 1.0000, Train Fert Acc: 1.0000, Val Fert Acc: 1.0000, LR: 0.000500
+2025-04-27 07:51:49,651 - INFO - No improvement for 9 epochs
+2025-04-27 07:52:18,990 - INFO - Epoch 11/50 - Train Loss: 0.0000, Val Loss: 0.0000, Train Crop Acc: 1.0000, Val Crop Acc: 1.0000, Train Fert Acc: 1.0000, Val Fert Acc: 1.0000, LR: 0.000500
+2025-04-27 07:52:18,990 - INFO - No improvement for 10 epochs
+2025-04-27 07:52:18,990 - INFO - Early stopping at epoch 11
+2025-04-27 07:52:18,993 - INFO - Training completed. Best model was from epoch 1
+2025-04-27 07:52:19,008 - INFO - Model saved to models/agri_model\best_model.pt
+2025-04-27 11:10:39,670 - INFO - Using device: cpu
+2025-04-27 11:10:39,671 - INFO - Found 1 CSV files in dataset/combined_dataset.csv
+2025-04-27 11:10:39,744 - INFO - Combined dataset has 14202 rows
+2025-04-27 11:10:39,753 - INFO - Loaded dataset with shape: (14202, 31)
+2025-04-27 11:10:39,779 - INFO - Crop class distribution: Counter({0: 14202})
+2025-04-27 11:10:39,781 - INFO - Fertilizer class distribution: Counter({0: 14202})
+2025-04-27 11:10:39,781 - INFO - Dataset metadata: {'input_dim': 28, 'crop_classes': 1, 'fertilizer_classes': 1, 'climate_classes': 0, 'feature_names': ['feature_Unnamed: 0', 'feature_Crop', 'feature_N', 'feature_P', 'feature_K', 'feature_pH', 'feature_Temperature', 'feature_Humidity', 'feature_Soil Moisture', 'feature_Soil Type', 'feature_Crop Type', 'feature_Nitrogen', 'feature_Potassium', 'feature_Phosphorus', 'feature_Fertilizer', 'feature_Temparature', 'feature_Moisture', 'feature_Soil_Type', 'feature_Crop_Type', 'feature_Phosphorous', 'feature_Humidity ', 'feature_Fertilizer Name', 'feature_soil_moisture', 'feature_Rainfall', 'feature_PH', 'feature_Carbon', 'feature_Soil', 'feature_Remark'], 'crop_mapping': {0: 'Unknown'}, 'fertilizer_mapping': {0: 'Unknown'}}
+2025-04-27 11:10:39,796 - INFO - Training set size: 11361
+2025-04-27 11:10:39,797 - INFO - Validation set size: 2841
+2025-04-27 11:10:39,833 - INFO - Initialized enhanced model with 943050 parameters
+2025-04-27 11:10:41,518 - INFO - Starting training for 50 epochs
+2025-04-27 11:11:09,504 - INFO - Epoch 1/50 - Train Loss: 0.0000, Val Loss: 0.0000, Train Crop Acc: 1.0000, Val Crop Acc: 1.0000, Train Fert Acc: 1.0000, Val Fert Acc: 1.0000, LR: 0.001000
+2025-04-27 11:11:09,508 - INFO - New best model at epoch 1
+2025-04-27 11:11:30,052 - INFO - Epoch 2/50 - Train Loss: 0.0000, Val Loss: 0.0000, Train Crop Acc: 1.0000, Val Crop Acc: 1.0000, Train Fert Acc: 1.0000, Val Fert Acc: 1.0000, LR: 0.001000
+2025-04-27 11:11:30,052 - INFO - No improvement for 1 epochs
+2025-04-27 11:11:50,564 - INFO - Epoch 3/50 - Train Loss: 0.0000, Val Loss: 0.0000, Train Crop Acc: 1.0000, Val Crop Acc: 1.0000, Train Fert Acc: 1.0000, Val Fert Acc: 1.0000, LR: 0.001000
+2025-04-27 11:11:50,565 - INFO - No improvement for 2 epochs
+2025-04-27 11:12:27,163 - INFO - Epoch 4/50 - Train Loss: 0.0000, Val Loss: 0.0000, Train Crop Acc: 1.0000, Val Crop Acc: 1.0000, Train Fert Acc: 1.0000, Val Fert Acc: 1.0000, LR: 0.001000
+2025-04-27 11:12:27,164 - INFO - No improvement for 3 epochs
+2025-04-27 11:13:00,736 - INFO - Epoch 5/50 - Train Loss: 0.0000, Val Loss: 0.0000, Train Crop Acc: 1.0000, Val Crop Acc: 1.0000, Train Fert Acc: 1.0000, Val Fert Acc: 1.0000, LR: 0.001000
+2025-04-27 11:13:00,737 - INFO - No improvement for 4 epochs
+2025-04-27 11:13:32,725 - INFO - Epoch 6/50 - Train Loss: 0.0000, Val Loss: 0.0000, Train Crop Acc: 1.0000, Val Crop Acc: 1.0000, Train Fert Acc: 1.0000, Val Fert Acc: 1.0000, LR: 0.001000
+2025-04-27 11:13:32,727 - INFO - No improvement for 5 epochs
+2025-04-27 11:14:01,914 - INFO - Epoch 7/50 - Train Loss: 0.0000, Val Loss: 0.0000, Train Crop Acc: 1.0000, Val Crop Acc: 1.0000, Train Fert Acc: 1.0000, Val Fert Acc: 1.0000, LR: 0.001000
+2025-04-27 11:14:01,915 - INFO - No improvement for 6 epochs
+2025-04-27 11:14:29,949 - INFO - Epoch 8/50 - Train Loss: 0.0000, Val Loss: 0.0000, Train Crop Acc: 1.0000, Val Crop Acc: 1.0000, Train Fert Acc: 1.0000, Val Fert Acc: 1.0000, LR: 0.000500
+2025-04-27 11:14:29,949 - INFO - No improvement for 7 epochs
+2025-04-27 11:14:59,181 - INFO - Epoch 9/50 - Train Loss: 0.0000, Val Loss: 0.0000, Train Crop Acc: 1.0000, Val Crop Acc: 1.0000, Train Fert Acc: 1.0000, Val Fert Acc: 1.0000, LR: 0.000500
+2025-04-27 11:14:59,182 - INFO - No improvement for 8 epochs
+2025-04-27 11:15:27,370 - INFO - Epoch 10/50 - Train Loss: 0.0000, Val Loss: 0.0000, Train Crop Acc: 1.0000, Val Crop Acc: 1.0000, Train Fert Acc: 1.0000, Val Fert Acc: 1.0000, LR: 0.000500
+2025-04-27 11:15:27,372 - INFO - No improvement for 9 epochs
+2025-04-27 11:15:55,717 - INFO - Epoch 11/50 - Train Loss: 0.0000, Val Loss: 0.0000, Train Crop Acc: 1.0000, Val Crop Acc: 1.0000, Train Fert Acc: 1.0000, Val Fert Acc: 1.0000, LR: 0.000500
+2025-04-27 11:15:55,719 - INFO - No improvement for 10 epochs
+2025-04-27 11:15:55,720 - INFO - Early stopping at epoch 11
+2025-04-27 11:15:55,724 - INFO - Training completed. Best model was from epoch 1
+2025-04-27 11:15:55,741 - INFO - Model saved to models/agri_model\best_model.pt
+2025-04-27 11:15:58,251 - INFO - Training history plot saved to models/agri_model\training_history.png
+2025-04-27 11:15:58,268 - INFO - Final model saved to models/agri_model\final_model.pt
+2025-04-27 11:15:58,268 - INFO - Training completed with final metrics:
+2025-04-27 11:15:58,269 - INFO -   Best validation loss: 0.0000
+2025-04-27 11:15:58,269 - INFO -   Best crop accuracy: 1.0000
+2025-04-27 11:15:58,269 - INFO -   Best fertilizer accuracy: 1.0000

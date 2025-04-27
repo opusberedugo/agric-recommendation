@@ -18,7 +18,7 @@ from scipy.spatial.distance import cosine
 import logging
 from tqdm import tqdm
 import sys
-from enhanced_model import EnhancedAgriRecommender, AgriMultiTaskModel
+from model import EnhancedAgriRecommender, AgriMultiTaskModel
 
 # Configure logging
 logging.basicConfig(
@@ -335,8 +335,17 @@ def generate_features(query_text, soil_params=None):
         normalized_vector.append((val - means[i]) / stds[i])
     
     # Fill remaining features with zeros if needed
+    input_dim = len(means)  # Default, will be overridden if model info is available
+    try:
+        model_info = load_model_info()
+        input_dim = model_info.get("input_dim", input_dim)
+    except:
+        pass
+    
     if len(normalized_vector) < input_dim:
         normalized_vector.extend([0.0] * (input_dim - len(normalized_vector)))
+    elif len(normalized_vector) > input_dim:
+        normalized_vector = normalized_vector[:input_dim]
     
     return torch.tensor(normalized_vector, dtype=torch.float32), query_analysis['task_id'], query_analysis
 
@@ -389,7 +398,7 @@ def predict_recommendation(model, query_text, soil_params=None, task_id=None, de
         top_ferts = [(idx.item(), fert_probs[0, idx].item()) for idx in top_fert_indices[0]]
         
         # Get embeddings for future similarity calculations
-        embeddings = outputs['embedding'].cpu().numpy()
+        embeddings = outputs['embedding'].cpu().numpy() if 'embedding' in outputs else None
         
         # Return comprehensive results
         return {
@@ -461,7 +470,7 @@ def generate_explanation(result, crop_mapping, fert_mapping):
         # Add alternative crops
         if len(result["top_crops"]) > 1:
             alternatives = []
-            for idx, (crop_id, conf) in enumerate(result["top_crops"][1:], 1):
+            for crop_id, conf in result["top_crops"][1:]:  # Skip the first one as it's already shown
                 crop = crop_mapping.get(crop_id, f"Crop {crop_id}")
                 alternatives.append(f"{crop} ({conf*100:.1f}%)")
             
@@ -774,6 +783,10 @@ def process_csv_input(file_path, model, crop_mapping, fert_mapping, output_path=
             logging.info(f"Results saved to {output_path}")
         
         return results_df
+    
+    except Exception as e:
+        logging.error(f"Error processing CSV file: {e}")
+        raise
 
 def interactive_mode(model, crop_mapping, fert_mapping, device="cpu"):
     """
