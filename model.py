@@ -13,6 +13,8 @@ class SoilFeatureEncoder(nn.Module):
     Specialized encoder for soil and environmental features that
     captures the relationships between soil nutrients, pH, and environmental factors.
     """
+
+    
     
     def __init__(self, input_dim, output_dim, dropout=0.1):
         super(SoilFeatureEncoder, self).__init__()

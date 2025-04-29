@@ -56,7 +56,7 @@ def load_nlp_components():
         print(f"Error loading NLP components: {e}")
         return None, None
 
-def generate_response(query, tokenizer, model, max_length=MAX_RESPONSE_LEN):
+def generate_response(query, tokenizer, model, max_length=MAX_RESPONSE_LEN):    
     """
     Generate a response to a query using the NLP model.
     
